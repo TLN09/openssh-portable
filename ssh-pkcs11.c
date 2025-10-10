@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11.c,v 1.71 2025/09/25 06:23:19 jsg Exp $ */
+/* $OpenBSD: ssh-pkcs11.c,v 1.74 2025/10/09 23:25:23 djm Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  * Copyright (c) 2014 Pedro Martelletto. All rights reserved.
@@ -34,6 +34,8 @@
 #include "openbsd-compat/openssl-compat.h"
 
 #ifdef WITH_OPENSSL
+#include "openbsd-compat/openssl-compat.h"
+#include <openssl/bn.h>
 #include <openssl/ecdsa.h>
 #include <openssl/x509.h>
 #include <openssl/err.h>
@@ -1484,7 +1486,7 @@ pkcs11_fetch_certs(struct pkcs11_provider *p, CK_ULONG slotidx,
 		case CKC_X_509:
 			if (pkcs11_fetch_x509_pubkey(p, slotidx, &obj,
 			    &key, &label) != 0) {
-				error("failed to fetch key");
+				debug_f("failed to fetch key");
 				continue;
 			}
 			break;
@@ -1611,7 +1613,7 @@ pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,
 		}
 
 		if (key == NULL) {
-			error("failed to fetch key");
+			debug_f("failed to fetch key");
 			continue;
 		}
 		note_key(p, slotidx, __func__, key);
@@ -2027,8 +2029,10 @@ pkcs11_terminate(void)
 
 	debug3_f("called");
 
-	while ((k11 = TAILQ_FIRST(&pkcs11_keys)) != NULL)
+	while ((k11 = TAILQ_FIRST(&pkcs11_keys)) != NULL) {
+		TAILQ_REMOVE(&pkcs11_keys, k11, next);
 		pkcs11_k11_free(k11);
+	}
 	while ((p = TAILQ_FIRST(&pkcs11_providers)) != NULL) {
 		TAILQ_REMOVE(&pkcs11_providers, p, next);
 		pkcs11_provider_finalize(p);
@@ -2285,11 +2289,13 @@ out:
 
 #include "log.h"
 #include "sshkey.h"
+#include "ssherr.h"
+#include "ssh-pkcs11.h"
 
 int
 pkcs11_init(int interactive)
 {
-	error_f("dlopen() not supported");
+	error_f("PKCS#11 not supported");
 	return (-1);
 }
 
@@ -2297,13 +2303,30 @@ int
 pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp,
     char ***labelsp)
 {
-	error_f("dlopen() not supported");
+	error_f("PKCS#11 not supported");
 	return (-1);
+}
+
+void
+pkcs11_key_free(struct sshkey *key)
+{
+	error_f("PKCS#11 not supported");
+}
+
+int
+pkcs11_sign(struct sshkey *key,
+    u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen,
+    const char *alg, const char *sk_provider,
+    const char *sk_pin, u_int compat)
+{
+	error_f("PKCS#11 not supported");
+	return SSH_ERR_FEATURE_UNSUPPORTED;
 }
 
 void
 pkcs11_terminate(void)
 {
-	error_f("dlopen() not supported");
+	error_f("PKCS#11 not supported");
 }
 #endif /* ENABLE_PKCS11 */
