@@ -112,6 +112,7 @@ extern const struct sshkey_impl sshkey_rsa_sha256_impl;
 extern const struct sshkey_impl sshkey_rsa_sha256_cert_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
+extern const struct sshkey_impl sshkey_ml_dsa_impl;
 #endif /* WITH_OPENSSL */
 
 const struct sshkey_impl * const keyimpls[] = {
@@ -143,6 +144,7 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha256_cert_impl,
 	&sshkey_rsa_sha512_impl,
 	&sshkey_rsa_sha512_cert_impl,
+	&sshkey_ml_dsa_impl,
 #endif /* WITH_OPENSSL */
 	NULL
 };
@@ -3372,6 +3374,7 @@ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
 	case KEY_ED25519_SK:
 #ifdef WITH_OPENSSL
 	case KEY_ECDSA_SK:
+	case KEY_ML_DSA:
 #endif /* WITH_OPENSSL */
 		return sshkey_private_to_blob2(key, blob, passphrase,
 		    comment, openssh_format_cipher, openssh_format_rounds);
