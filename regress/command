@@ -1,0 +1,29 @@
+#!/bin/sh
+#set -x
+me="$1" ; shift
+next="$1"
+if test ! -z "$me" ; then 
+	rm -f /Users/tln/cs/masters/openssh-portable/regress/done
+	echo "HOSTNAME host_$me"
+	echo "AUTHINFO"
+	cat $SSH_USER_AUTH
+fi
+echo AGENT
+/Users/tln/cs/masters/openssh-portable/ssh-add -L | egrep "^ssh" | cut -d" " -f-2 | env LC_ALL=C sort
+if test -z "$next" ; then 
+	touch /Users/tln/cs/masters/openssh-portable/regress/done
+	echo "FINISH"
+	e=0
+else
+	echo NEXT
+	/Users/tln/cs/masters/openssh-portable/regress/ssh-log-wrapper.sh -F /Users/tln/cs/masters/openssh-portable/regress/ssh_proxy_noid -oIdentityFile=/Users/tln/cs/masters/openssh-portable/regress/user_a 		host_$next /Users/tln/cs/masters/openssh-portable/regress/command "$@"
+	e=$?
+fi
+echo "COMPLETE \"$me\""
+if test ! -z "$me" ; then 
+	if test ! -f /Users/tln/cs/masters/openssh-portable/regress/done ; then
+		echo "DONE MARKER MISSING"
+		test $e -eq 0 && e=63
+	fi
+fi
+exit $e

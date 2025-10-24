@@ -1,0 +1,19 @@
+	StrictModes		no
+	Port			4242
+	AddressFamily		inet
+	ListenAddress		127.0.0.1
+	#ListenAddress		::1
+	AuthorizedKeysFile	/Users/tln/cs/masters/openssh-portable/regress/authorized_keys_%u
+	LogLevel		DEBUG3
+	AcceptEnv		_XXX_TEST_*
+	AcceptEnv		_XXX_TEST
+	Subsystem	sftp	/Users/tln/cs/masters/openssh-portable/sftp-server
+	SshdSessionPath		/Users/tln/cs/masters/openssh-portable/sshd-session
+	SshdAuthPath		/Users/tln/cs/masters/openssh-portable/sshd-auth
+	PerSourcePenalties	no
+	ModuliFile '/Users/tln/cs/masters/openssh-portable/moduli'
+StrictModes no
+SecurityKeyProvider /Users/tln/cs/masters/openssh-portable/regress/misc/sk-dummy/sk-dummy.so
+ExposeAuthInfo yes
+PidFile none
+Hostkey /Users/tln/cs/masters/openssh-portable/regress/host_b

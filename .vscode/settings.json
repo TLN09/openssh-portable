@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "types.h": "c",
+        "sshbuf.h": "c",
+        "sshkey.h": "c",
+        "ssherr.h": "c",
+        "ssh-ml-dsa.h": "c"
+    }
+}

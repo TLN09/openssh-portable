@@ -1,0 +1,71 @@
+Executing: /Users/tln/cs/masters/openssh-portable/ssh -F /Users/tln/cs/masters/openssh-portable/regress/ssh_proxy 999.999.999.999 true
+debug3: channel_clear_timeouts: clearing
+debug1: Executing proxy command: exec env SSH_SK_HELPER="/Users/tln/cs/masters/openssh-portable/ssh-sk-helper" /Users/tln/cs/masters/openssh-portable/regress/sshd-log-wrapper.sh -i -f /Users/tln/cs/masters/openssh-portable/regress/sshd_proxy
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519: ED25519 SHA256:R77/6xWlwvXu/e5MVtfmi4V1yGQCyb30fcoojyqi1Ac
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519 type 2
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519: ED25519-CERT SHA256:l9OrE3Q0DJgiSCxYYZOFrxWq/dN4fY+B9TfQn5YJEUQ
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com: ED25519-SK SHA256:CgucZIv6emcwTUiDk01pGWMPG+A+nnkJyUo+Y0veM4M
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com type 8
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com: ED25519-SK-CERT SHA256:JlCK0oq0gJCIF3aCccWdOFIf9HL9jaQafuH/bQu7m/M
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256: ECDSA SHA256:AHZwG1/uJ0iQPMVkKy7Bj3r/UsLTWQNGJquroBr+XnY
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256: ECDSA-CERT SHA256:/WdYMri6QDF5/sMz1KNusnvQ0xpPEMvLfVHDejmRpyM
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384: ECDSA SHA256:apgWw/3EKmNVdIuYrbn4nTjn7MdvPrOxBKzHLVFgCZ4
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384: ECDSA-CERT SHA256:97P0IYL/drS447c+iTKiKLaOkIG4uLFenJ/H+MI3u4Y
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521: ECDSA SHA256:aNsmUY+8boF/gQPYQ+1piFdL5FErgBNnYwX5wSt2eOo
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521: ECDSA-CERT SHA256:q5JkvyJ9Yzy0Z3SluHCDhUrlYsh77QGQWr8LgbImanw
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com: ECDSA-SK SHA256:Xb1p06dr9AeuRH8aPmHdgeUREovY8jG7MpknC5p/yi0
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com type 6
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com: ECDSA-SK-CERT SHA256:HV5S4wZ5ef8Twl9eizie5mPcSEDo+wZJui0JBS2mb/M
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa: RSA SHA256:GFe8W3CRNR6mjZbb8DFQsIiWhM1BxQ8Gk5mQmqMlI48
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa type 0
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa: RSA-CERT SHA256:WPxUZoBOVfsCMFYAh34n63xBw/dBsOEDXW11W/ksEl4
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa: ML-DSA SHA256:Y8B9b2IxgkZYm4Z5wmejVuy41mD3CQM/FDMj8OlHxLE
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa type 10
+debug1: no identity pubkey loaded from /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa
+debug1: Local version string SSH-2.0-OpenSSH_10.2
+FATAL:
+
+Executing: /Users/tln/cs/masters/openssh-portable/ssh -F /Users/tln/cs/masters/openssh-portable/regress/ssh_proxy 999.999.999.999 true
+debug3: channel_clear_timeouts: clearing
+debug1: Executing proxy command: exec env SSH_SK_HELPER="/Users/tln/cs/masters/openssh-portable/ssh-sk-helper" /Users/tln/cs/masters/openssh-portable/regress/sshd-log-wrapper.sh -i -f /Users/tln/cs/masters/openssh-portable/regress/sshd_proxy
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519: ED25519 SHA256:R77/6xWlwvXu/e5MVtfmi4V1yGQCyb30fcoojyqi1Ac
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519 type 2
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519: ED25519-CERT SHA256:l9OrE3Q0DJgiSCxYYZOFrxWq/dN4fY+B9TfQn5YJEUQ
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com: ED25519-SK SHA256:CgucZIv6emcwTUiDk01pGWMPG+A+nnkJyUo+Y0veM4M
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com type 8
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com: ED25519-SK-CERT SHA256:JlCK0oq0gJCIF3aCccWdOFIf9HL9jaQafuH/bQu7m/M
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256: ECDSA SHA256:AHZwG1/uJ0iQPMVkKy7Bj3r/UsLTWQNGJquroBr+XnY
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256: ECDSA-CERT SHA256:/WdYMri6QDF5/sMz1KNusnvQ0xpPEMvLfVHDejmRpyM
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384: ECDSA SHA256:apgWw/3EKmNVdIuYrbn4nTjn7MdvPrOxBKzHLVFgCZ4
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384: ECDSA-CERT SHA256:97P0IYL/drS447c+iTKiKLaOkIG4uLFenJ/H+MI3u4Y
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521: ECDSA SHA256:aNsmUY+8boF/gQPYQ+1piFdL5FErgBNnYwX5wSt2eOo
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521 type 1
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521: ECDSA-CERT SHA256:q5JkvyJ9Yzy0Z3SluHCDhUrlYsh77QGQWr8LgbImanw
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com: ECDSA-SK SHA256:Xb1p06dr9AeuRH8aPmHdgeUREovY8jG7MpknC5p/yi0
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com type 6
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com: ECDSA-SK-CERT SHA256:HV5S4wZ5ef8Twl9eizie5mPcSEDo+wZJui0JBS2mb/M
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa: RSA SHA256:GFe8W3CRNR6mjZbb8DFQsIiWhM1BxQ8Gk5mQmqMlI48
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa type 0
+debug1: loaded identity pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa: RSA-CERT SHA256:WPxUZoBOVfsCMFYAh34n63xBw/dBsOEDXW11W/ksEl4
+debug1: loaded pubkey from /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa: ML-DSA SHA256:Y8B9b2IxgkZYm4Z5wmejVuy41mD3CQM/FDMj8OlHxLE
+debug1: identity file /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa type 10
+debug1: no identity pubkey loaded from /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa
+debug1: Local version string SSH-2.0-OpenSSH_10.2
+FATAL:
+FAIL:
+
+FATAL: ca sign failed
+
+FATAL: ca sign failed
+FAIL: ca sign failed
+
+FATAL: ca sign failed
+
+FATAL: ca sign failed
+FAIL: ca sign failed
+

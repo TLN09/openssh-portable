@@ -3368,13 +3368,13 @@ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
 #ifdef WITH_OPENSSL
 	case KEY_ECDSA:
 	case KEY_RSA:
+	case KEY_ML_DSA:
 		break; /* see below */
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
 	case KEY_ED25519_SK:
 #ifdef WITH_OPENSSL
 	case KEY_ECDSA_SK:
-	case KEY_ML_DSA:
 #endif /* WITH_OPENSSL */
 		return sshkey_private_to_blob2(key, blob, passphrase,
 		    comment, openssh_format_cipher, openssh_format_rounds);
