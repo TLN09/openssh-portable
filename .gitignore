@@ -37,6 +37,8 @@ sshd-auth
 !regress/misc/**/Makefile
 !regress/unittests/**/Makefile
 tags
+ssh-ml-dsa-test
+.vscode
 
 # Ignored on main branch
 config.h.in
