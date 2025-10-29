@@ -60,39 +60,81 @@ int serialize_deserialize_priv_eq(struct sshkey *key) {
     return r;
 }
 
+int ml_dsa_44_signature_generation(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data = "Take your MEDS";
+    size_t datalen = strlen(data);
+    char *alg = NULL;
+
+    int r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0);
+    
+    // if (!r) {
+    //     // Signature generated. Print it
+    //     for (int i = 0; i < siglen; i++) {
+    //         printf("%x", sig[i]);
+    //     }
+    //     printf("\n");
+    // }
+
+    return r;
+}
+
+int ml_dsa_44_signature_verification(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data = "Take your MEDS";
+    size_t datalen = strlen(data);
+    char *alg = NULL;
+
+    if (ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) {
+        printf("Failed signature generation for ml-dsa-44 when trying to generate for verification\n");
+        return 1;
+    }
+    
+    int r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL);
+    if (r) {
+        printf("Error code: %d\n", r);
+        printf("Error: %s\n", ssh_err(r));
+    }
+
+    return r;
+}
+
 
 int main(void) {
-    int r = SSH_ERR_INTERNAL_ERROR;
     struct sshkey *key = sshkey_new(KEY_ML_DSA);
-    r = generate_key(key);
-    if (r != 0) {
+    if (generate_key(key)) {
         printf("FAILED KEY GENERATION\n");
         goto out;
     }
     
-    r = equals_works(key);
-    if (r != 0) {
-        printf("equal does not work: %d\n", r);
+    if (equals_works(key)) {
+        printf("equal does not work\n");
         goto out;
     }
     
-    r = serialize_deserialize_pub_eq(key);
-    if (r != 0) {
+    if (serialize_deserialize_pub_eq(key)) {
         printf("Serialization then deserialization public key is not equal\n");
         goto out;
     }
     
-    r = serialize_deserialize_priv_eq(key);
-    if (r != 0) {
+    if (serialize_deserialize_priv_eq(key)) {
         printf("Serialization then deserialization private key is not equal\n");
         goto out;
     }
     
-    r = serialize_deserialize_priv_eq(key);
-    if (r != 0) {
-        printf("Serialization then deserialization private key is not equal\n");
+    if (ml_dsa_44_signature_generation(key)) {
+        printf("Signature generation fails for ML-DSA-44\n");
         goto out;
     }
+    
+    if (ml_dsa_44_signature_verification(key)) {
+        printf("Signature verification fails for ML-DSA-44\n");
+        goto out;
+    }
+
+    printf("All Tests Passed!\n");
 
   out:
     sshkey_free(key);

@@ -23,6 +23,7 @@
 #include "openbsd-compat/openssl-compat.h"
 #include <openssl/evp.h>
 #include <openssl/err.h>
+#include <openssl/core.h>
 
 #include <stdarg.h>
 #include <string.h>
@@ -80,7 +81,7 @@ ssh_ml_dsa_serialize_public(
     if (key->pkey == NULL) {
         return SSH_ERR_INVALID_ARGUMENT;
     }
-    
+
     uint8_t pub[1312];
     size_t pub_len;
     if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, sizeof(pub), &pub_len)) {
@@ -141,18 +142,6 @@ ssh_ml_dsa_serialize_private(
         sshbuf_put_u8(buffer, private[i]);
         // // printf("%x", private[i]);
     }
-    // // printf("\n");
-    
-    // if (!EVP_PKEY_get_octet_string_param(key->pkey, "priv", private, sizeof(private), &priv_len)) {
-    //     // printf("ml-dsa: failed getting private key from key->pkey\n");
-    //     return SSH_ERR_LIBCRYPTO_ERROR;
-    // }
-
-    // // printf("ml-dsa: priv_len = %d\n", priv_len);
-    // if ((r = sshbuf_put_string(buffer, &private, priv_len)) != 0) {
-    //     // printf("ml-dsa: failed moving private key to sshbuffer\n");
-    //     return r;
-    // }
 
     return 0;
 }
@@ -167,36 +156,20 @@ ssh_ml_dsa_deserialize_private(
     // TODO: Take keytype into consideration
     uint8_t private[2560];
     size_t private_len = sizeof(private);
-    // EVP_PKEY_CTX *ctx = NULL;
     EVP_PKEY *new = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
-    // if ((r = sshbuf_get_string(buffer, &private, &private_len)) != 0) {
-    //     // printf("ml-dsa: failed getting data from buffer: %d\n", r);
-    //     return r;
-    // }
+
     for (int i = 0; i < private_len; i++) {
         sshbuf_get_u8(buffer, &private[i]);
         // // printf("%x", private[i]);
     }
     // // printf("\n");
 
-    // if ((ctx = EVP_PKEY_CTX_new_from_name(NULL, "ML-DSA-44", NULL)) == NULL) {
-    //     // printf("ml-dsa: EVP_PKEY_CTX failed creation\n");
-    //     return SSH_ERR_ALLOC_FAIL;
-    // }
-
-    // if ((new = EVP_PKEY_new_raw_private_key_ex(ctx, "ML-DSA-44", NULL, private, sizeof(private))) == NULL) {
-    //     // printf("ml-dsa: failed creation of EVP_PKEY from data\n");
-    //     EVP_PKEY_CTX_free(ctx);
-    //     return SSH_ERR_LIBCRYPTO_ERROR;
-    // }
-
     if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {
         // printf("ml-dsa: failed creating of EVP_PKEY from data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
-    // EVP_PKEY_CTX_free(ctx);
     key->pkey = new;
     return 0;
 }
@@ -256,8 +229,68 @@ ssh_ml_dsa_sign(
     const char *sk_pin, 
     u_int compat
 ) {
-    // printf("ml-dsa: sign function called\n");
-    return SSH_ERR_INTERNAL_ERROR;
+    size_t sig_len;
+    u_char *sig = NULL;
+    EVP_PKEY_CTX *sctx = NULL;
+    EVP_SIGNATURE *sig_alg = NULL;
+    int r = SSH_ERR_INTERNAL_ERROR;
+
+    if (lenp != NULL)
+		*lenp = 0;
+	if (sigp != NULL)
+		*sigp = NULL;
+    
+    const OSSL_PARAM params[] = {
+        OSSL_PARAM_octet_string("context-string", (u_char *) "A context string", 16),
+        OSSL_PARAM_END
+    };
+
+    if ((sctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
+        printf("ml-dsa: failed creating context from pkey\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
+        printf("ml-dsa: failed fetching signature algorithm\n");
+        r = SSH_ERR_SIGN_ALG_UNSUPPORTED;
+        goto out;
+    }
+
+    if (!(r = EVP_PKEY_sign_message_init(sctx, sig_alg, params))) {
+        printf("ml-dsa: message signature initialization failed\n");
+        if (r == -2) {
+            r = SSH_ERR_SIGN_ALG_UNSUPPORTED;
+        }
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+    
+    if (!EVP_PKEY_sign(sctx, NULL, &sig_len, data, datalen)) {
+        printf("ml-dsa: failed fetching signature length\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    sig = OPENSSL_zalloc(sig_len);
+    if (!EVP_PKEY_sign(sctx, sig, &sig_len, data, datalen)) {
+        printf("ml-dsa: failed siging the message\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    *lenp = sig_len;
+    *sigp = malloc(sig_len);
+    memcpy(*sigp, sig, sig_len);
+    
+    // Success
+    r = 0;
+
+  out:
+    OPENSSL_free(sig);
+    EVP_SIGNATURE_free(sig_alg);
+    EVP_PKEY_CTX_free(sctx);
+    return r;
 } /* optional */
 
 int
@@ -271,8 +304,46 @@ ssh_ml_dsa_verify(
     u_int compat,
     struct sshkey_sig_details **detailsp
 ) {
-    // printf("ml-dsa: verify function called\n");
-    return SSH_ERR_INTERNAL_ERROR;
+    EVP_PKEY_CTX *ctx = NULL;
+    EVP_SIGNATURE *sig_alg = NULL;
+    int r = SSH_ERR_INTERNAL_ERROR;
+    
+    const OSSL_PARAM params[] = {
+        OSSL_PARAM_octet_string("context-string", (u_char *) "A context string", 16),
+        OSSL_PARAM_END
+    };
+
+    if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
+        printf("ml-dsa: failed creating context from pkey\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
+        printf("ml-dsa: failed fetching signature algorithm\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    if (!EVP_PKEY_verify_message_init(ctx, sig_alg, params)) {
+        printf("ml-dsa: Context initialization failed\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+    
+    if (!EVP_PKEY_verify(ctx, sig, siglen, data, datalen)) {
+        printf("ml-dsa: failed signature verification\n");
+        r = SSH_ERR_SIGNATURE_INVALID;
+        goto out;
+    }
+
+    // Success
+    r = 0;
+    
+  out:
+    EVP_SIGNATURE_free(sig_alg);
+    EVP_PKEY_CTX_free(ctx);
+    return r;
 }
 
 static const struct sshkey_impl_funcs sshkey_ml_dsa_funcs = {

@@ -4,6 +4,7 @@
         "sshbuf.h": "c",
         "sshkey.h": "c",
         "ssherr.h": "c",
-        "ssh-ml-dsa.h": "c"
+        "ssh-ml-dsa.h": "c",
+        "openssl-compat.h": "c"
     }
 }
