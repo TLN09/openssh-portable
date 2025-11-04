@@ -9,8 +9,12 @@ int generate_key(struct sshkey *key) {
     return ssh_ml_dsa_generate(key, 0);
 }
 
-int equals_works(struct sshkey *key) {
+int key_equal_itself(struct sshkey *key) {
     return ssh_ml_dsa_equal(key, key) != 1;
+}
+
+int key_not_equal_another(struct sshkey *key, struct sshkey *other) {
+    return ssh_ml_dsa_equal(key, other);
 }
 
 int serialize_deserialize_pub_eq(struct sshkey *key) {
@@ -104,13 +108,20 @@ int ml_dsa_44_signature_verification(struct sshkey *key) {
 
 int main(void) {
     struct sshkey *key = sshkey_new(KEY_ML_DSA);
+    struct sshkey *other = sshkey_new(KEY_ML_DSA);
+
     if (generate_key(key)) {
         printf("FAILED KEY GENERATION\n");
         goto out;
     }
     
-    if (equals_works(key)) {
-        printf("equal does not work\n");
+    if (key_equal_itself(key)) {
+        printf("key not equal to itself\n");
+        goto out;
+    }
+
+    if (key_not_equal_another(key, other)) {
+        printf("key equal to another\n");
         goto out;
     }
     
@@ -138,4 +149,5 @@ int main(void) {
 
   out:
     sshkey_free(key);
+    sshkey_free(other);
 }

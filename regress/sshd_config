@@ -1,0 +1,24 @@
+	StrictModes		no
+	Port			4242
+	AddressFamily		inet
+	ListenAddress		127.0.0.1
+	#ListenAddress		::1
+	PidFile			/Users/tln/cs/masters/openssh-portable/regress/pidfile
+	AuthorizedKeysFile	/Users/tln/cs/masters/openssh-portable/regress/authorized_keys_%u
+	LogLevel		DEBUG3
+	AcceptEnv		_XXX_TEST_*
+	AcceptEnv		_XXX_TEST
+	Subsystem	sftp	/Users/tln/cs/masters/openssh-portable/sftp-server
+	SshdSessionPath		/Users/tln/cs/masters/openssh-portable/sshd-session
+	SshdAuthPath		/Users/tln/cs/masters/openssh-portable/sshd-auth
+	PerSourcePenalties	no
+	ModuliFile '/Users/tln/cs/masters/openssh-portable/moduli'
+SecurityKeyProvider /Users/tln/cs/masters/openssh-portable/regress/misc/sk-dummy/sk-dummy.so
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ssh-ed25519
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.sk-ssh-ed25519@openssh.com
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp256
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp384
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp521
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.sk-ecdsa-sha2-nistp256@openssh.com
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ssh-rsa
+HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ssh-ml-dsa

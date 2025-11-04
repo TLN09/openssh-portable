@@ -1,0 +1,22 @@
+Host *
+	Hostname		127.0.0.1
+	HostKeyAlias		localhost-with-alias
+	Port			4242
+	User			tln
+	GlobalKnownHostsFile	/Users/tln/cs/masters/openssh-portable/regress/known_hosts
+	UserKnownHostsFile	/Users/tln/cs/masters/openssh-portable/regress/known_hosts
+	PubkeyAuthentication	yes
+	ChallengeResponseAuthentication	no
+	PasswordAuthentication	no
+	BatchMode		yes
+	StrictHostKeyChecking	yes
+	LogLevel		DEBUG3
+SecurityKeyProvider /Users/tln/cs/masters/openssh-portable/regress/misc/sk-dummy/sk-dummy.so
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ssh-ed25519
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/sk-ssh-ed25519@openssh.com
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp256
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp384
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ecdsa-sha2-nistp521
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/sk-ecdsa-sha2-nistp256@openssh.com
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ssh-rsa
+IdentityFile /Users/tln/cs/masters/openssh-portable/regress/ssh-ml-dsa
