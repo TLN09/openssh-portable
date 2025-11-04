@@ -72,6 +72,7 @@ int ml_dsa_44_signature_generation(struct sshkey *key) {
     char *alg = NULL;
 
     int r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0);
+    printf("Signature length: %d\n", siglen);
     
     // if (!r) {
     //     // Signature generated. Print it

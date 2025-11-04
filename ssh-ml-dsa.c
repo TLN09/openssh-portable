@@ -234,11 +234,11 @@ ssh_ml_dsa_encode_store_sig(
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
-
-    if ((r = sshbuf_put_string(b, sig, sig_len)) != 0) {
-        printf("ml-dsa: adding string to buffer failed\n");
-        goto out;
-    }
+    if ((r = sshbuf_put_cstring(b, "ssh-ml-dsa")) != 0 ||
+	    (r = sshbuf_put_string(b, sig, sig_len)) != 0) {
+            printf("ml-dsa: Failed putting signature in buffer\n");
+            goto out;
+        }
     len = sshbuf_len(b);
 
     // Store signature
@@ -351,6 +351,7 @@ ssh_ml_dsa_verify(
     EVP_SIGNATURE *sig_alg = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
     u_char *signature;
+    char *signature_type = NULL;
     struct sshbuf *b = NULL;
     
     const OSSL_PARAM params[] = {
@@ -381,6 +382,12 @@ ssh_ml_dsa_verify(
         goto out;
     }
 
+    if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
+        printf("ml-dsa: Failed getting signature type from buffer\n");
+        r = SSH_ERR_INVALID_FORMAT;
+        goto out;
+    }
+    
     if (sshbuf_get_string(b, &signature, &siglen) != 0) {
         r = SSH_ERR_INVALID_FORMAT;
         goto out;
@@ -399,6 +406,7 @@ ssh_ml_dsa_verify(
     EVP_SIGNATURE_free(sig_alg);
     EVP_PKEY_CTX_free(ctx);
     sshbuf_free(b);
+    free(signature_type);
     return r;
 }
 
