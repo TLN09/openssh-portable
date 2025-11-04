@@ -218,6 +218,48 @@ ssh_ml_dsa_copy_public(
 }
 
 int
+ssh_ml_dsa_encode_store_sig(
+    const u_char *sig,
+    size_t sig_len,
+    u_char **sigp,
+    size_t *lenp
+) {
+    struct sshbuf *b = NULL;
+    int r = SSH_ERR_INTERNAL_ERROR;
+    size_t len;
+
+    // Encode signature
+    if ((b = sshbuf_new()) == NULL) {
+        printf("ml-dsa: encoding buffer allocation failed\n");
+        r = SSH_ERR_ALLOC_FAIL;
+        goto out;
+    }
+
+    if ((r = sshbuf_put_string(b, sig, sig_len)) != 0) {
+        printf("ml-dsa: adding string to buffer failed\n");
+        goto out;
+    }
+    len = sshbuf_len(b);
+
+    // Store signature
+    if (sigp != NULL) {
+        if ((*sigp = malloc(len)) == NULL) {
+            r = SSH_ERR_ALLOC_FAIL;
+            goto out;
+        }
+        memcpy(*sigp, sshbuf_ptr(b), len);
+    }
+    if (lenp != NULL)
+        *lenp = len;
+    
+    r = 0;
+
+  out:
+    sshbuf_free(b);
+    return r;
+}
+
+int
 ssh_ml_dsa_sign(
     struct sshkey *key,
     u_char **sigp,
@@ -279,9 +321,10 @@ ssh_ml_dsa_sign(
         goto out;
     }
 
-    *lenp = sig_len;
-    *sigp = malloc(sig_len);
-    memcpy(*sigp, sig, sig_len);
+    if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp)) != 0) {
+        printf("ml-dsa: signature encoding/storing failed\n");
+        goto out;
+    }
     
     // Success
     r = 0;
@@ -307,6 +350,8 @@ ssh_ml_dsa_verify(
     EVP_PKEY_CTX *ctx = NULL;
     EVP_SIGNATURE *sig_alg = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
+    u_char *signature;
+    struct sshbuf *b = NULL;
     
     const OSSL_PARAM params[] = {
         OSSL_PARAM_octet_string("context-string", (u_char *) "A context string", 16),
@@ -330,8 +375,18 @@ ssh_ml_dsa_verify(
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
+
+    if ((b = sshbuf_from(sig, siglen)) == NULL) {
+        r = SSH_ERR_ALLOC_FAIL;
+        goto out;
+    }
+
+    if (sshbuf_get_string(b, &signature, &siglen) != 0) {
+        r = SSH_ERR_INVALID_FORMAT;
+        goto out;
+    }
     
-    if (!EVP_PKEY_verify(ctx, sig, siglen, data, datalen)) {
+    if (!EVP_PKEY_verify(ctx, signature, siglen, data, datalen)) {
         printf("ml-dsa: failed signature verification\n");
         r = SSH_ERR_SIGNATURE_INVALID;
         goto out;
@@ -343,6 +398,7 @@ ssh_ml_dsa_verify(
   out:
     EVP_SIGNATURE_free(sig_alg);
     EVP_PKEY_CTX_free(ctx);
+    sshbuf_free(b);
     return r;
 }
 
