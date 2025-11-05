@@ -39,7 +39,7 @@ u_int
 ssh_ml_dsa_size(
     const struct sshkey *key
 ) {
-    // printf("ml-dsa: size function called\n");
+    // debug3_f("ml-dsa: size function called\n");
     return SSH_ERR_INTERNAL_ERROR;
 }	/* optional */
 
@@ -56,7 +56,7 @@ void
 ssh_ml_dsa_cleanup(
     struct sshkey *key
 ) {
-    // printf("ml-dsa: cleanup function called\n");
+    // debug3_f("ml-dsa: cleanup function called\n");
 }	/* optional */
 
 int
@@ -64,7 +64,7 @@ ssh_ml_dsa_equal(
     const struct sshkey *a,
     const struct sshkey *b
 ) {
-    // printf("ml-dsa: equal function called\n");
+    // debug3_f("ml-dsa: equal function called\n");
     if (a->pkey == NULL || b->pkey == NULL) {
         return 0;
     }
@@ -85,13 +85,13 @@ ssh_ml_dsa_serialize_public(
     uint8_t pub[1312];
     size_t pub_len;
     if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        // printf("ml-dsa: failed getting public key from key->pkey\n");
+        // debug3_f("ml-dsa: failed getting public key from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
    for (int i = 0; i < pub_len; i++) {
         r = sshbuf_put_u8(buffer, pub[i]);
-        // // printf("%x", pub[i]);
+        // // debug3_f("%x", pub[i]);
     }
 
     return 0;
@@ -104,18 +104,18 @@ ssh_ml_dsa_deserialize_public(
     struct sshkey *key
 ) {
     // TODO: Take keytype into consideration
-    // printf("ml-dsa: deserialize public function called\n");
+    // debug3_f("ml-dsa: deserialize public function called\n");
     uint8_t pub[1312];
     size_t pub_len = sizeof(pub);
     EVP_PKEY *new = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
     for (int i = 0; i < pub_len; i++) {
         sshbuf_get_u8(buffer, &pub[i]);
-        // // printf("%x", pub[i]);
+        // // debug3_f("%x", pub[i]);
     }
 
     if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        // printf("ml-dsa: failed creation of EVP_PKEY from data\n");
+        // debug3_f("ml-dsa: failed creation of EVP_PKEY from data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -129,18 +129,18 @@ ssh_ml_dsa_serialize_private(
     struct sshbuf *buffer,
     enum sshkey_serialize_rep options
 ) {
-    // printf("ml-dsa: serialize private function called\n");
+    // debug3_f("ml-dsa: serialize private function called\n");
     int r = SSH_ERR_INTERNAL_ERROR;
     uint8_t private[2560];
     size_t priv_len = sizeof(private);
     
     if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
-        // printf("ml-dsa: failed getting private key data from key->pkey\n");
+        // debug3_f("ml-dsa: failed getting private key data from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
     for (int i = 0; i < priv_len; i++) {
         sshbuf_put_u8(buffer, private[i]);
-        // // printf("%x", private[i]);
+        // // debug3_f("%x", private[i]);
     }
 
     return 0;
@@ -152,7 +152,7 @@ ssh_ml_dsa_deserialize_private(
     struct sshbuf *buffer, 
     struct sshkey *key
 ) {
-    // printf("ml-dsa: deserialize private function called with type: %s\n", key_type);
+    // debug3_f("ml-dsa: deserialize private function called with type: %s\n", key_type);
     // TODO: Take keytype into consideration
     uint8_t private[2560];
     size_t private_len = sizeof(private);
@@ -161,12 +161,12 @@ ssh_ml_dsa_deserialize_private(
 
     for (int i = 0; i < private_len; i++) {
         sshbuf_get_u8(buffer, &private[i]);
-        // // printf("%x", private[i]);
+        // // debug3_f("%x", private[i]);
     }
-    // // printf("\n");
+    // // debug3_f("\n");
 
     if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {
-        // printf("ml-dsa: failed creating of EVP_PKEY from data\n");
+        // debug3_f("ml-dsa: failed creating of EVP_PKEY from data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -179,16 +179,16 @@ ssh_ml_dsa_generate(
     struct sshkey *key, 
     int bits
 ) {
-    // printf("ml-dsa: starting key generation\n");
+    // debug3_f("ml-dsa: starting key generation\n");
     EVP_PKEY *res = NULL;
     
     if ((res = EVP_PKEY_Q_keygen(NULL, NULL, "ML-DSA-44")) == NULL) {
 		// Failed key generation so return error
-        // printf("ml-dsa: failed to generate key pair\n");
+        // debug3_f("ml-dsa: failed to generate key pair\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
-    // printf("ml-dsa: successfull key generation. Saving key\n");
+    // debug3_f("ml-dsa: successfull key generation. Saving key\n");
     key->pkey = res;
 	return 0;
 }
@@ -198,18 +198,18 @@ ssh_ml_dsa_copy_public(
     const struct sshkey *from,
     struct sshkey *to
 ) {
-    // printf("ml-dsa: copy public key\n");
+    // debug3_f("ml-dsa: copy public key\n");
     EVP_PKEY *new = NULL;
     // TODO: Make size dependend on the ML-DSA security level and properly free the memory as well
     uint8_t pub[1312];
     size_t pub_len;
     if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        // printf("ml-dsa: failed getting public key from key->pkey\n");
+        // debug3_f("ml-dsa: failed getting public key from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
     if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        // printf("ml-dsa: failed creating new public key from the public key data\n");
+        // debug3_f("ml-dsa: failed creating new public key from the public key data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -230,13 +230,13 @@ ssh_ml_dsa_encode_store_sig(
 
     // Encode signature
     if ((b = sshbuf_new()) == NULL) {
-        printf("ml-dsa: encoding buffer allocation failed\n");
+        debug3_f("ml-dsa: encoding buffer allocation failed\n");
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
     if ((r = sshbuf_put_cstring(b, "ssh-ml-dsa")) != 0 ||
 	    (r = sshbuf_put_string(b, sig, sig_len)) != 0) {
-            printf("ml-dsa: Failed putting signature in buffer\n");
+            debug3_f("ml-dsa: Failed putting signature in buffer\n");
             goto out;
         }
     len = sshbuf_len(b);
@@ -288,19 +288,19 @@ ssh_ml_dsa_sign(
     };
 
     if ((sctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
-        printf("ml-dsa: failed creating context from pkey\n");
+        debug3_f("ml-dsa: failed creating context from pkey\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
 
     if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
-        printf("ml-dsa: failed fetching signature algorithm\n");
+        debug3_f("ml-dsa: failed fetching signature algorithm\n");
         r = SSH_ERR_SIGN_ALG_UNSUPPORTED;
         goto out;
     }
 
     if (!(r = EVP_PKEY_sign_message_init(sctx, sig_alg, params))) {
-        printf("ml-dsa: message signature initialization failed\n");
+        debug3_f("ml-dsa: message signature initialization failed\n");
         if (r == -2) {
             r = SSH_ERR_SIGN_ALG_UNSUPPORTED;
         }
@@ -309,20 +309,20 @@ ssh_ml_dsa_sign(
     }
     
     if (!EVP_PKEY_sign(sctx, NULL, &sig_len, data, datalen)) {
-        printf("ml-dsa: failed fetching signature length\n");
+        debug3_f("ml-dsa: failed fetching signature length\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
 
     sig = OPENSSL_zalloc(sig_len);
     if (!EVP_PKEY_sign(sctx, sig, &sig_len, data, datalen)) {
-        printf("ml-dsa: failed siging the message\n");
+        debug3_f("ml-dsa: failed siging the message\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
 
     if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp)) != 0) {
-        printf("ml-dsa: signature encoding/storing failed\n");
+        debug3_f("ml-dsa: signature encoding/storing failed\n");
         goto out;
     }
     
@@ -360,19 +360,19 @@ ssh_ml_dsa_verify(
     };
 
     if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
-        printf("ml-dsa: failed creating context from pkey\n");
+        debug3_f("ml-dsa: failed creating context from pkey\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
 
     if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
-        printf("ml-dsa: failed fetching signature algorithm\n");
+        debug3_f("ml-dsa: failed fetching signature algorithm\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
 
     if (!EVP_PKEY_verify_message_init(ctx, sig_alg, params)) {
-        printf("ml-dsa: Context initialization failed\n");
+        debug3_f("ml-dsa: Context initialization failed\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
@@ -383,7 +383,7 @@ ssh_ml_dsa_verify(
     }
 
     if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
-        printf("ml-dsa: Failed getting signature type from buffer\n");
+        debug3_f("ml-dsa: Failed getting signature type from buffer\n");
         r = SSH_ERR_INVALID_FORMAT;
         goto out;
     }
@@ -394,7 +394,7 @@ ssh_ml_dsa_verify(
     }
     
     if (!EVP_PKEY_verify(ctx, signature, siglen, data, datalen)) {
-        printf("ml-dsa: failed signature verification\n");
+        debug3_f("ml-dsa: failed signature verification\n");
         r = SSH_ERR_SIGNATURE_INVALID;
         goto out;
     }
