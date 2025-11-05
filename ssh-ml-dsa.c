@@ -276,6 +276,7 @@ ssh_ml_dsa_sign(
     EVP_PKEY_CTX *sctx = NULL;
     EVP_SIGNATURE *sig_alg = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
+    debug3_f("Siging using ml-dsa\n");
 
     if (lenp != NULL)
 		*lenp = 0;
@@ -353,6 +354,7 @@ ssh_ml_dsa_verify(
     u_char *signature;
     char *signature_type = NULL;
     struct sshbuf *b = NULL;
+    debug3_f("Verifying signature for ml-dsa\n");
     
     const OSSL_PARAM params[] = {
         OSSL_PARAM_octet_string("context-string", (u_char *) "A context string", 16),

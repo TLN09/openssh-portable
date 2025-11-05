@@ -72,15 +72,31 @@ int ml_dsa_44_signature_generation(struct sshkey *key) {
     char *alg = NULL;
 
     int r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0);
-    printf("Signature length: %d\n", siglen);
     
-    // if (!r) {
-    //     // Signature generated. Print it
-    //     for (int i = 0; i < siglen; i++) {
-    //         printf("%x", sig[i]);
-    //     }
-    //     printf("\n");
-    // }
+    if (!r) {
+        // Signature generated. check if sigtype is inserted correctly starts
+        struct sshbuf *b = NULL;
+        char *signature_type = NULL;
+        if ((b = sshbuf_from(sig, siglen)) == NULL) {
+            r = SSH_ERR_ALLOC_FAIL;
+            goto out;
+        }
+
+        if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
+            printf("ml-dsa: Failed getting signature type from buffer\n");
+            r = SSH_ERR_INVALID_FORMAT;
+            goto out;
+        }
+
+        if ((r = strcmp("ssh-ml-dsa", signature_type)) != 0) {
+            // Should never happen
+            printf("ml-dsa: signature type incorrect\n");
+            goto out;
+        }
+      
+      out:
+        sshbuf_free(b);
+    }
 
     return r;
 }
@@ -98,9 +114,92 @@ int ml_dsa_44_signature_verification(struct sshkey *key) {
     }
     
     int r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL);
-    if (r) {
+    if (r != 0) {
         printf("Error code: %d\n", r);
         printf("Error: %s\n", ssh_err(r));
+    }
+
+    return r;
+}
+
+int ml_dsa_44_signature_verification_should_fail(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data_signed = "Take your MEDS";
+    u_char *data_validated = "Don't take your MEDS";
+    size_t datalen_signed = strlen(data_signed);
+    size_t datalen_validated = strlen(data_validated);
+    char *alg = NULL;
+
+    if (ssh_ml_dsa_sign(key, &sig, &siglen, data_signed, datalen_signed, alg, NULL, NULL, 0)) {
+        printf("Failed signature generation for ml-dsa-44 when trying to generate for verification\n");
+        return 1;
+    }
+    
+    int r = ssh_ml_dsa_verify(key, sig, siglen, data_validated, datalen_validated, alg, 0, NULL);
+    if (r != SSH_ERR_SIGNATURE_INVALID) {
+        printf("Error code: %d\n", r);
+        printf("Error: %s\n", ssh_err(r));
+    }
+
+    return r;
+}
+
+int ml_dsa_44_signature_validation_using_sshkey_verify(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data = "Take your MEDS";
+    size_t datalen = strlen(data);
+    char *alg = NULL;
+    int r = SSH_ERR_SIGNATURE_INVALID;
+    
+    if ((r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
+        printf("Failed signature generation for ml-dsa-44 when trying to generate for verification\n");
+        return r;
+    }
+
+    if ((r = sshkey_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
+        return r;
+    }
+
+    return r;
+}
+
+int ml_dsa_44_signing_using_sshkey_sign_direct_verify(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data = "Take your MEDS";
+    size_t datalen = strlen(data);
+    char *alg = NULL;
+    int r = SSH_ERR_SIGNATURE_INVALID;
+    
+    if ((r = sshkey_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
+        printf("Failed signature generation for ml-dsa-44 when trying to generate for verification\n");
+        return r;
+    }
+
+    if ((r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
+        return r;
+    }
+
+    return r;
+}
+
+int ml_dsa_44_sshkey_sign_then_sshkey_verify(struct sshkey *key) {
+    u_char *sig = NULL;
+    size_t siglen; // will be overwritten by the signing function
+    u_char *data = "Take your MEDS";
+    size_t datalen = strlen(data);
+    char *alg = NULL;
+    int r = SSH_ERR_SIGNATURE_INVALID;
+    
+    if ((r = sshkey_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
+        printf("Failed signature generation for ml-dsa-44 when trying to generate for verification\n");
+        return r;
+    }
+
+    if ((r = sshkey_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
+        return r;
     }
 
     return r;
@@ -143,6 +242,26 @@ int main(void) {
     
     if (ml_dsa_44_signature_verification(key)) {
         printf("Signature verification fails for ML-DSA-44\n");
+        goto out;
+    }
+    
+    if (ml_dsa_44_signature_verification_should_fail(key) == 0) {
+        printf("Signature verification succeeds when it should not for ML-DSA-44\n");
+        goto out;
+    }
+
+    if (ml_dsa_44_signature_validation_using_sshkey_verify(key)) {
+        printf("Signature not verified with sshkey_verify function\n");
+        goto out;
+    }
+    
+    if (ml_dsa_44_signing_using_sshkey_sign_direct_verify(key)) {
+        printf("Signature not verified when signing with sshkey_sign function\n");
+        goto out;
+    }
+    
+    if (ml_dsa_44_sshkey_sign_then_sshkey_verify(key)) {
+        printf("Signature not verified using sshkey_sign and sshkey_verify\n");
         goto out;
     }
 
