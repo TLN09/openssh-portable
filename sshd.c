@@ -1295,6 +1295,7 @@ print_config(struct connection_info *connection_info)
 int
 main(int ac, char **av)
 {
+	debug3_f("SANITY CHECK");
 	extern char *optarg;
 	extern int optind;
 	int log_stderr = 0, inetd_flag = 0, test_flag = 0, no_daemon_flag = 0;
