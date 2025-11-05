@@ -60,6 +60,7 @@
 #include "match.h"
 #include "ssh-sk.h"
 #include "ssh-pkcs11.h"
+#include "log.h"
 
 #include "openbsd-compat/openssl-compat.h"
 
@@ -2160,9 +2161,26 @@ sshkey_check_sigtype(const u_char *sig, size_t siglen,
 		return 0;
 	if ((expected_alg = sshkey_sigalg_by_name(requested_alg)) == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
-	if ((r = sshkey_get_sigtype(sig, siglen, &sigtype)) != 0)
-		return r;
+
+	struct sshbuf *b = NULL;
+	if ((b = sshbuf_from(sig, siglen)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+
+	if (sshbuf_get_cstring(b, &sigtype, NULL) != 0) {
+		printf("ml-dsa: Failed getting signature type from buffer\n");
+		r = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
+	printf("%s\n", sigtype);
+	printf("%s\n", expected_alg);
+	// if ((r = sshkey_get_sigtype(sig, siglen, &sigtype)) != 0)
+	// 	return r;
 	r = strcmp(expected_alg, sigtype) == 0;
+	printf("%d\n", r);
+  out:
+	sshbuf_free(b);
 	free(sigtype);
 	return r ? 0 : SSH_ERR_SIGN_ALG_UNSUPPORTED;
 }
@@ -2224,6 +2242,7 @@ sshkey_verify(const struct sshkey *key,
 		return SSH_ERR_INVALID_ARGUMENT;
 	if ((impl = sshkey_impl_from_key(key)) == NULL)
 		return SSH_ERR_KEY_TYPE_UNKNOWN;
+	debug3_f("key implementation fetched: %s", impl->name);
 	return impl->funcs->verify(key, sig, siglen, data, dlen,
 	    alg, compat, detailsp);
 }
