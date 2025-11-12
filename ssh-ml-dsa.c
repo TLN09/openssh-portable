@@ -104,7 +104,7 @@ ssh_ml_dsa_deserialize_public(
     struct sshkey *key
 ) {
     // TODO: Take keytype into consideration
-    debug3_f("ml-dsa: deserialize public function called\n");
+    debug3_f("ml-dsa: deserialize public function called");
     uint8_t pub[1312];
     size_t pub_len = sizeof(pub);
     EVP_PKEY *new = NULL;
@@ -113,9 +113,11 @@ ssh_ml_dsa_deserialize_public(
     // sshbuf_put_string works fine, so it is kind of weird
     u_char *p = sshbuf_ptr(buffer);
     memcpy(pub, p + 4, pub_len);
+    sshbuf_consume(buffer, pub_len + 4); // Tell the buffer you have read its contents
 
+    debug3_f("creating new public key from raw key data");
     if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        debug3_f("ml-dsa: failed creation of EVP_PKEY from data\n");
+        debug3_f("ml-dsa: failed creation of EVP_PKEY from data");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -153,7 +155,7 @@ ssh_ml_dsa_deserialize_private(
     struct sshbuf *buffer, 
     struct sshkey *key
 ) {
-    debug3_f("ml-dsa: deserialize private function called with type: %s\n", key_type);
+    debug3_f("ml-dsa: deserialize private function called");
     // TODO: Take keytype into consideration
     uint8_t private[2560];
     size_t private_len = sizeof(private);
@@ -163,9 +165,9 @@ ssh_ml_dsa_deserialize_private(
     // sshbuf_put_string works fine, so it is kind of weird
     u_char *p = sshbuf_ptr(buffer);
     memcpy(private, p + 4, private_len);
-
+    sshbuf_consume(buffer, private_len + 4); // Tell the buffer you have read its contents
     if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {
-        debug3_f("ml-dsa: failed creating of EVP_PKEY from data\n");
+        debug3_f("ml-dsa: failed creating of EVP_PKEY from data");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 

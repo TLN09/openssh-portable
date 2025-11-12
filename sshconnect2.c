@@ -1564,6 +1564,10 @@ load_identity_file(Identity *id)
 				break;
 			}
 			/* FALLTHROUGH */
+		case SSH_ERR_LIBCRYPTO_ERROR:
+			error_r(r, "HOW DOES THIS HAPPEN?");
+			quit = 1;
+			break;
 		default:
 			error_r(r, "Load key \"%s\"", id->filename);
 			quit = 1;

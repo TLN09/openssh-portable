@@ -2027,6 +2027,7 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 			goto out;
 		}
 	}
+	debug3_f("WHY is this called there?");
 	if ((ret = impl->funcs->deserialize_public(ktype, b, key)) != 0)
 		goto out;
 
@@ -2036,6 +2037,7 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 
 	if (key != NULL && sshbuf_len(b) != 0) {
 		ret = SSH_ERR_INVALID_FORMAT;
+		debug3_f("buffer not empty");
 		goto out;
 	}
 	ret = 0;
@@ -2618,6 +2620,7 @@ sshkey_private_deserialize_sk(struct sshbuf *buf, struct sshkey *k)
 int
 sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 {
+	debug3_f("PRIVATE deserialize called");
 	const struct sshkey_impl *impl;
 	char *tname = NULL;
 	char *expect_sk_application = NULL;
@@ -2630,6 +2633,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 	if ((r = sshbuf_get_cstring(buf, &tname, NULL)) != 0)
 		goto out;
 	type = sshkey_type_from_name(tname);
+	debug3_f("keytype: %s", type);
 	if (sshkey_type_is_cert(type)) {
 		/*
 		 * Certificate key private keys begin with the certificate
@@ -2666,6 +2670,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 		r = SSH_ERR_INTERNAL_ERROR;
 		goto out;
 	}
+	debug3_f("calling impl->funcs->deserialize_PRIVATE");
 	if ((r = impl->funcs->deserialize_private(tname, buf, k)) != 0)
 		goto out;
 
@@ -3075,8 +3080,10 @@ private2_decrypt(struct sshbuf *decoded, const char *passphrase,
 	}
 
 	if ((r = sshkey_froms(decoded, &pubkey)) != 0 ||
-	    (r = sshbuf_get_u32(decoded, &encrypted_len)) != 0)
+	    (r = sshbuf_get_u32(decoded, &encrypted_len)) != 0) {
+		debug3_fr(r, "why does this fail here?");
 		goto out;
+	}
 
 	if ((cipher = cipher_by_name(ciphername)) == NULL) {
 		r = SSH_ERR_KEY_UNKNOWN_CIPHER;
@@ -3186,6 +3193,7 @@ static int
 sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
+	debug3_f("PARSE PRIVATE 2");
 	char *comment = NULL;
 	int r = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *decoded = NULL, *decrypted = NULL;
@@ -3196,27 +3204,33 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
+	debug3_f("test");
 	/* Undo base64 encoding and decrypt the private section */
 	if ((r = private2_uudecode(blob, &decoded)) != 0 ||
 	    (r = private2_decrypt(decoded, passphrase,
 	    &decrypted, &pubkey)) != 0)
 		goto out;
 
+	debug3_f("test1");
 	if (type != KEY_UNSPEC &&
 	    sshkey_type_plain(type) != sshkey_type_plain(pubkey->type)) {
 		r = SSH_ERR_KEY_TYPE_MISMATCH;
 		goto out;
 	}
 
+	debug3_f("test2");
 	/* Load the private key and comment */
 	if ((r = sshkey_private_deserialize(decrypted, &k)) != 0 ||
-	    (r = sshbuf_get_cstring(decrypted, &comment, NULL)) != 0)
-		goto out;
+	    (r = sshbuf_get_cstring(decrypted, &comment, NULL)) != 0) {
+			goto out;
+	}
 
+	debug3_f("test3");
 	/* Check deterministic padding after private section */
 	if ((r = private2_check_padding(decrypted)) != 0)
 		goto out;
 
+	debug3_f("test4");
 	/* Check that the public key in the envelope matches the private key */
 	if (!sshkey_equal(pubkey, k)) {
 		r = SSH_ERR_INVALID_FORMAT;
@@ -3234,6 +3248,7 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 		comment = NULL;
 	}
  out:
+	debug3_f("OUT OF PARSE PRIVATE 2");
 	free(comment);
 	sshbuf_free(decoded);
 	sshbuf_free(decrypted);
@@ -3648,6 +3663,7 @@ int
 sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
     const char *passphrase, struct sshkey **keyp, char **commentp)
 {
+	debug3_f("PARSING PRIVATE FILEBLOB");
 	int r = SSH_ERR_INTERNAL_ERROR;
 
 	if (keyp != NULL)
