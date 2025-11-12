@@ -2003,6 +2003,7 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		goto out;
 	}
 	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
+		debug3_f("sshbuf_get_cstring failed");
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
@@ -2023,11 +2024,12 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 	if (sshkey_type_is_cert(type)) {
 		/* Skip nonce that precedes all certificates */
 		if (sshbuf_get_string_direct(b, NULL, NULL) != 0) {
+			debug3_f("failed get_string_direct");
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 	}
-	debug3_f("WHY is this called there?");
+
 	if ((ret = impl->funcs->deserialize_public(ktype, b, key)) != 0)
 		goto out;
 
