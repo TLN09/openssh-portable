@@ -111,7 +111,7 @@ ssh_ml_dsa_deserialize_public(
     
     // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
     // sshbuf_put_string works fine, so it is kind of weird
-    u_char *p = sshbuf_ptr(buffer);
+    const u_char *p = sshbuf_ptr(buffer);
     memcpy(pub, p + 4, pub_len);
     sshbuf_consume(buffer, pub_len + 4); // Tell the buffer you have read its contents
 
@@ -163,7 +163,7 @@ ssh_ml_dsa_deserialize_private(
 
     // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
     // sshbuf_put_string works fine, so it is kind of weird
-    u_char *p = sshbuf_ptr(buffer);
+    const u_char *p = sshbuf_ptr(buffer);
     memcpy(private, p + 4, private_len);
     sshbuf_consume(buffer, private_len + 4); // Tell the buffer you have read its contents
     if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {

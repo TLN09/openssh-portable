@@ -2633,7 +2633,6 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 	if ((r = sshbuf_get_cstring(buf, &tname, NULL)) != 0)
 		goto out;
 	type = sshkey_type_from_name(tname);
-	debug3_f("keytype: %s", type);
 	if (sshkey_type_is_cert(type)) {
 		/*
 		 * Certificate key private keys begin with the certificate
