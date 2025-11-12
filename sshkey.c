@@ -114,6 +114,7 @@ extern const struct sshkey_impl sshkey_rsa_sha256_cert_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
 extern const struct sshkey_impl sshkey_ml_dsa_impl;
+extern const struct sshkey_impl sshkey_ml_dsa_cert_impl;
 #endif /* WITH_OPENSSL */
 
 const struct sshkey_impl * const keyimpls[] = {
@@ -146,6 +147,7 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha512_impl,
 	&sshkey_rsa_sha512_cert_impl,
 	&sshkey_ml_dsa_impl,
+	&sshkey_ml_dsa_cert_impl,
 #endif /* WITH_OPENSSL */
 	NULL
 };
@@ -431,6 +433,8 @@ sshkey_type_plain(int type)
 		return KEY_ED25519;
 	case KEY_ED25519_SK_CERT:
 		return KEY_ED25519_SK;
+	case KEY_ML_DSA_CERT:
+		return KEY_ML_DSA;
 	default:
 		return type;
 	}
@@ -451,6 +455,8 @@ sshkey_type_certified(int type)
 		return KEY_ED25519_CERT;
 	case KEY_ED25519_SK:
 		return KEY_ED25519_SK_CERT;
+	case KEY_ML_DSA:
+		return KEY_ML_DSA_CERT;
 	default:
 		return -1;
 	}
@@ -2169,16 +2175,12 @@ sshkey_check_sigtype(const u_char *sig, size_t siglen,
 	}
 
 	if (sshbuf_get_cstring(b, &sigtype, NULL) != 0) {
-		printf("ml-dsa: Failed getting signature type from buffer\n");
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
-	printf("%s\n", sigtype);
-	printf("%s\n", expected_alg);
 	// if ((r = sshkey_get_sigtype(sig, siglen, &sigtype)) != 0)
 	// 	return r;
 	r = strcmp(expected_alg, sigtype) == 0;
-	printf("%d\n", r);
   out:
 	sshbuf_free(b);
 	free(sigtype);

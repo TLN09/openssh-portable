@@ -274,7 +274,8 @@ ask_filename(struct passwd *pw, const char *prompt)
 			name = _PATH_SSH_CLIENT_ID_ED25519_SK;
 			break;
 		case KEY_ML_DSA:
-			name = _PATH_SSH_CLIENT_ID_ML_DSA_44;
+		case KEY_ML_DSA_CERT:
+			name = _PATH_SSH_CLIENT_ID_ML_DSA;
 			break;
 		default:
 			fatal("bad key type");
@@ -1806,8 +1807,9 @@ do_ca_sign(struct passwd *pw, const char *ca_key_path, int prefer_agent,
 			    tmp, sshkey_type(public));
 
 		/* Prepare certificate to sign */
-		if ((r = sshkey_to_certified(public)) != 0)
+		if ((r = sshkey_to_certified(public)) != 0) {
 			fatal_r(r, "Could not upgrade key %s to certificate", tmp);
+		}
 		public->cert->type = cert_key_type;
 		public->cert->serial = (u_int64_t)cert_serial;
 		public->cert->key_id = xstrdup(cert_key_id);

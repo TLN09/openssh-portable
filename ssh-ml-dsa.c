@@ -39,7 +39,7 @@ u_int
 ssh_ml_dsa_size(
     const struct sshkey *key
 ) {
-    // debug3_f("ml-dsa: size function called\n");
+    debug3_f("ml-dsa: size function called\n");
     return SSH_ERR_INTERNAL_ERROR;
 }	/* optional */
 
@@ -56,7 +56,7 @@ void
 ssh_ml_dsa_cleanup(
     struct sshkey *key
 ) {
-    // debug3_f("ml-dsa: cleanup function called\n");
+    debug3_f("ml-dsa: cleanup function called\n");
 }	/* optional */
 
 int
@@ -64,7 +64,7 @@ ssh_ml_dsa_equal(
     const struct sshkey *a,
     const struct sshkey *b
 ) {
-    // debug3_f("ml-dsa: equal function called\n");
+    debug3_f("ml-dsa: equal function called\n");
     if (a->pkey == NULL || b->pkey == NULL) {
         return 0;
     }
@@ -85,13 +85,13 @@ ssh_ml_dsa_serialize_public(
     uint8_t pub[1312];
     size_t pub_len;
     if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        // debug3_f("ml-dsa: failed getting public key from key->pkey\n");
+        debug3_f("ml-dsa: failed getting public key from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
-   for (int i = 0; i < pub_len; i++) {
-        r = sshbuf_put_u8(buffer, pub[i]);
-        // // debug3_f("%x", pub[i]);
+    if ((r = sshbuf_put_string(buffer, pub, pub_len)) != 0) {
+        debug3_f("failed putting key data into sshbuf");
+        return r;
     }
 
     return 0;
@@ -104,18 +104,18 @@ ssh_ml_dsa_deserialize_public(
     struct sshkey *key
 ) {
     // TODO: Take keytype into consideration
-    // debug3_f("ml-dsa: deserialize public function called\n");
+    debug3_f("ml-dsa: deserialize public function called\n");
     uint8_t pub[1312];
     size_t pub_len = sizeof(pub);
     EVP_PKEY *new = NULL;
-    int r = SSH_ERR_INTERNAL_ERROR;
-    for (int i = 0; i < pub_len; i++) {
-        sshbuf_get_u8(buffer, &pub[i]);
-        // // debug3_f("%x", pub[i]);
-    }
+    
+    // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
+    // sshbuf_put_string works fine, so it is kind of weird
+    u_char *p = sshbuf_ptr(buffer);
+    memcpy(pub, p + 4, pub_len);
 
     if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        // debug3_f("ml-dsa: failed creation of EVP_PKEY from data\n");
+        debug3_f("ml-dsa: failed creation of EVP_PKEY from data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -129,18 +129,19 @@ ssh_ml_dsa_serialize_private(
     struct sshbuf *buffer,
     enum sshkey_serialize_rep options
 ) {
-    // debug3_f("ml-dsa: serialize private function called\n");
+    debug3_f("ml-dsa: serialize private function called\n");
     int r = SSH_ERR_INTERNAL_ERROR;
     uint8_t private[2560];
     size_t priv_len = sizeof(private);
     
     if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
-        // debug3_f("ml-dsa: failed getting private key data from key->pkey\n");
+        debug3_f("ml-dsa: failed getting private key data from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
-    for (int i = 0; i < priv_len; i++) {
-        sshbuf_put_u8(buffer, private[i]);
-        // // debug3_f("%x", private[i]);
+
+    if ((r = sshbuf_put_string(buffer, private, priv_len)) != 0) {
+        debug3_f("failed putting key data into sshbuf");
+        return r;
     }
 
     return 0;
@@ -152,21 +153,19 @@ ssh_ml_dsa_deserialize_private(
     struct sshbuf *buffer, 
     struct sshkey *key
 ) {
-    // debug3_f("ml-dsa: deserialize private function called with type: %s\n", key_type);
+    debug3_f("ml-dsa: deserialize private function called with type: %s\n", key_type);
     // TODO: Take keytype into consideration
     uint8_t private[2560];
     size_t private_len = sizeof(private);
     EVP_PKEY *new = NULL;
-    int r = SSH_ERR_INTERNAL_ERROR;
 
-    for (int i = 0; i < private_len; i++) {
-        sshbuf_get_u8(buffer, &private[i]);
-        // // debug3_f("%x", private[i]);
-    }
-    // // debug3_f("\n");
+    // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
+    // sshbuf_put_string works fine, so it is kind of weird
+    u_char *p = sshbuf_ptr(buffer);
+    memcpy(private, p + 4, private_len);
 
     if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {
-        // debug3_f("ml-dsa: failed creating of EVP_PKEY from data\n");
+        debug3_f("ml-dsa: failed creating of EVP_PKEY from data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -179,16 +178,16 @@ ssh_ml_dsa_generate(
     struct sshkey *key, 
     int bits
 ) {
-    // debug3_f("ml-dsa: starting key generation\n");
+    debug3_f("ml-dsa: starting key generation\n");
     EVP_PKEY *res = NULL;
     
     if ((res = EVP_PKEY_Q_keygen(NULL, NULL, "ML-DSA-44")) == NULL) {
 		// Failed key generation so return error
-        // debug3_f("ml-dsa: failed to generate key pair\n");
+        debug3_f("ml-dsa: failed to generate key pair\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
-    // debug3_f("ml-dsa: successfull key generation. Saving key\n");
+    debug3_f("ml-dsa: successfull key generation. Saving key\n");
     key->pkey = res;
 	return 0;
 }
@@ -198,18 +197,18 @@ ssh_ml_dsa_copy_public(
     const struct sshkey *from,
     struct sshkey *to
 ) {
-    // debug3_f("ml-dsa: copy public key\n");
+    debug3_f("ml-dsa: copy public key\n");
     EVP_PKEY *new = NULL;
     // TODO: Make size dependend on the ML-DSA security level and properly free the memory as well
     uint8_t pub[1312];
     size_t pub_len;
     if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        // debug3_f("ml-dsa: failed getting public key from key->pkey\n");
+        debug3_f("ml-dsa: failed getting public key from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
     if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        // debug3_f("ml-dsa: failed creating new public key from the public key data\n");
+        debug3_f("ml-dsa: failed creating new public key from the public key data\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
 
@@ -436,6 +435,18 @@ const struct sshkey_impl sshkey_ml_dsa_impl = {
 	/* .type = */		KEY_ML_DSA,
 	/* .nid = */		0,
 	/* .cert = */		0,
+	/* .sigonly = */	0,
+	/* .keybits = */	0,
+	/* .funcs = */		&sshkey_ml_dsa_funcs,
+};
+
+const struct sshkey_impl sshkey_ml_dsa_cert_impl = {
+	/* .name = */		"ssh-ml-dsa-cert",
+	/* .shortname = */	"ML-DSA-CERT",
+	/* .sigalg = */		NULL,
+	/* .type = */		KEY_ML_DSA_CERT,
+	/* .nid = */		0,
+	/* .cert = */		1,
 	/* .sigonly = */	0,
 	/* .keybits = */	0,
 	/* .funcs = */		&sshkey_ml_dsa_funcs,
