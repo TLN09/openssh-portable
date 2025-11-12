@@ -1987,6 +1987,7 @@ static int
 sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
     int allow_cert)
 {
+	debug3_f("SANITY CHECK");
 	int type, ret = SSH_ERR_INTERNAL_ERROR;
 	char *ktype = NULL;
 	struct sshkey *key = NULL;
