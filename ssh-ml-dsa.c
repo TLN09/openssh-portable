@@ -39,8 +39,12 @@ u_int
 ssh_ml_dsa_size(
     const struct sshkey *key
 ) {
-    debug3_f("ml-dsa: size function called\n");
-    return SSH_ERR_INTERNAL_ERROR;
+    debug3_f("ml-dsa: size function called");
+    if (key->pkey == NULL) {
+        return SSH_ERR_INVALID_ARGUMENT;
+    }
+    
+    return EVP_PKEY_get_security_category(key->pkey);
 }	/* optional */
 
 int 
@@ -56,7 +60,9 @@ void
 ssh_ml_dsa_cleanup(
     struct sshkey *key
 ) {
-    debug3_f("ml-dsa: cleanup function called\n");
+    debug3_f("ml-dsa: cleanup function called");
+    EVP_PKEY_free(key->pkey);
+    key->pkey = NULL;
 }	/* optional */
 
 int
@@ -82,19 +88,34 @@ ssh_ml_dsa_serialize_public(
         return SSH_ERR_INVALID_ARGUMENT;
     }
 
-    uint8_t pub[1312];
+    uint8_t *pub = NULL;
     size_t pub_len;
+    
+    // TODO: Check if EVP_PKEY_get_raw_public_key could be used instead
+    // Seems to be the appropriate function to call here instead of this
     if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        debug3_f("ml-dsa: failed getting public key from key->pkey\n");
+        debug3_f("ml-dsa: failed getting size of public key buffer\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
+    }
+    
+    pub = malloc(pub_len);
+    if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, pub_len, &pub_len)) {
+        debug3_f("ml-dsa: failed getting public key data\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
     }
 
     if ((r = sshbuf_put_string(buffer, pub, pub_len)) != 0) {
-        debug3_f("failed putting key data into sshbuf");
-        return r;
+        debug3_f("failed putting key data into sshbuf");  
+        goto out;
     }
 
-    return 0;
+    // success
+    r = 0;
+
+  out:
+    free(pub);
+    return r;
 }
 
 int
@@ -103,26 +124,65 @@ ssh_ml_dsa_deserialize_public(
     struct sshbuf *buffer, 
     struct sshkey *key
 ) {
-    // TODO: Take keytype into consideration
     debug3_f("ml-dsa: deserialize public function called");
-    uint8_t pub[1312];
-    size_t pub_len = sizeof(pub);
+    uint8_t *pub;
+    size_t pub_len;
+    u_int32_t length;
     EVP_PKEY *new = NULL;
+    int r = SSH_ERR_INTERNAL_ERROR;
+    
+    // Read fist 4 bytes as the key length and use that to check keytype, create pub buffer, etc.
+    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
+        debug3_f("failed getting public key length");
+        return r;
+    }
+
+    pub_len = (size_t)length;
+    pub = malloc(pub_len);
     
     // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
     // sshbuf_put_string works fine, so it is kind of weird
     const u_char *p = sshbuf_ptr(buffer);
-    memcpy(pub, p + 4, pub_len);
-    sshbuf_consume(buffer, pub_len + 4); // Tell the buffer you have read its contents
+    memcpy(pub, p, pub_len);
+    sshbuf_consume(buffer, pub_len); // Tell the buffer you have read its contents
 
-    debug3_f("creating new public key from raw key data");
-    if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
-        debug3_f("ml-dsa: failed creation of EVP_PKEY from data");
-        return SSH_ERR_LIBCRYPTO_ERROR;
+    int type = 0;
+    switch (pub_len) { // Key lengths from FIPS 204 standard document
+        case 1312:
+            type = EVP_PKEY_ML_DSA_44;
+            break;
+        
+        case 1952:
+            type = EVP_PKEY_ML_DSA_65;
+            break;
+        
+        case 2592:
+            type = EVP_PKEY_ML_DSA_87;
+            break;
+        
+        default: // Should never happen but just in case
+            r = SSH_ERR_INTERNAL_ERROR;
+            break;
     }
 
+    if (r != 0) {
+        goto out;
+    }
+
+    debug3_f("creating new public key from raw key data");
+    if ((new = EVP_PKEY_new_raw_public_key(type, NULL, pub, pub_len)) == NULL) {
+        debug3_f("ml-dsa: failed creation of EVP_PKEY from data");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    // Success
+    r = 0;
     key->pkey = new;
-    return 0;
+
+  out:
+    free(pub);
+    return r;
 }
 
 int
@@ -131,22 +191,34 @@ ssh_ml_dsa_serialize_private(
     struct sshbuf *buffer,
     enum sshkey_serialize_rep options
 ) {
-    debug3_f("ml-dsa: serialize private function called\n");
+    debug3_f("ml-dsa: serialize private function called");
     int r = SSH_ERR_INTERNAL_ERROR;
-    uint8_t private[2560];
-    size_t priv_len = sizeof(private);
+    uint8_t *private = NULL;
+    size_t priv_len;
     
+    // If the buffer priv is NULL then *len is populated with the number of bytes required to hold the key
     if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
-        debug3_f("ml-dsa: failed getting private key data from key->pkey\n");
+        debug3_f("ml-dsa: failed getting private key length");
         return SSH_ERR_LIBCRYPTO_ERROR;
+    }
+    
+    private = malloc(priv_len);
+    if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
+        debug3_f("ml-dsa: failed getting pricate key data");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
     }
 
     if ((r = sshbuf_put_string(buffer, private, priv_len)) != 0) {
         debug3_f("failed putting key data into sshbuf");
-        return r;
+        goto out;
     }
 
-    return 0;
+    // Success
+    r = 0;
+  out:
+    free(private);
+    return r;
 }
 
 int
@@ -156,23 +228,63 @@ ssh_ml_dsa_deserialize_private(
     struct sshkey *key
 ) {
     debug3_f("ml-dsa: deserialize private function called");
-    // TODO: Take keytype into consideration
-    uint8_t private[2560];
-    size_t private_len = sizeof(private);
+    uint8_t *private;
+    size_t private_len;
+    u_int32_t length;
     EVP_PKEY *new = NULL;
+    int r = SSH_ERR_INTERNAL_ERROR;
+
+    // Read fist 4 bytes as the key length and use that to check keytype, create pub buffer, etc.
+    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
+        debug3_f("failed getting private key length");
+        return r;
+    }
+
+    private_len = (size_t)length;
+    private = malloc(private_len);
 
     // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
     // sshbuf_put_string works fine, so it is kind of weird
     const u_char *p = sshbuf_ptr(buffer);
-    memcpy(private, p + 4, private_len);
-    sshbuf_consume(buffer, private_len + 4); // Tell the buffer you have read its contents
-    if ((new = EVP_PKEY_new_raw_private_key(EVP_PKEY_ML_DSA_44, NULL, private, sizeof(private))) == NULL) {
-        debug3_f("ml-dsa: failed creating of EVP_PKEY from data");
-        return SSH_ERR_LIBCRYPTO_ERROR;
+    memcpy(private, p, private_len);
+    sshbuf_consume(buffer, private_len); // Tell the buffer you have read its contents
+
+    int type = 0;
+    switch (private_len) { // Key lengths from FIPS 204 standard document
+        case 2560:
+            type = EVP_PKEY_ML_DSA_44;
+            break;
+        
+        case 4032:
+            type = EVP_PKEY_ML_DSA_65;
+            break;
+        
+        case 4896:
+            type = EVP_PKEY_ML_DSA_87;
+            break;
+        
+        default: // Should never happen but just in case
+            r = SSH_ERR_INTERNAL_ERROR;
+            break;
     }
 
+    if (r != 0) {
+        goto out;
+    }
+
+    if ((new = EVP_PKEY_new_raw_private_key(type, NULL, private, private_len)) == NULL) {
+        debug3_f("ml-dsa: failed creating of EVP_PKEY from data");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    // Success
+    r = 0;
     key->pkey = new;
-    return 0;
+  
+  out:
+    free(private);
+    return r;
 }
 
 int
@@ -182,8 +294,25 @@ ssh_ml_dsa_generate(
 ) {
     debug3_f("ml-dsa: starting key generation\n");
     EVP_PKEY *res = NULL;
+    char *key_type;
+    switch (bits) {
+        case 0: // Default value.
+        case 44:
+            key_type = "ML-DSA-44";
+            break;
+        case 65:
+            key_type = "ML-DSA-65";
+            break;
+        case 87:
+            key_type = "ML-DSA-87";
+            break;
+        
+        default:
+            return SSH_ERR_INVALID_ARGUMENT;
+    }
     
-    if ((res = EVP_PKEY_Q_keygen(NULL, NULL, "ML-DSA-44")) == NULL) {
+    
+    if ((res = EVP_PKEY_Q_keygen(NULL, NULL, key_type)) == NULL) {
 		// Failed key generation so return error
         debug3_f("ml-dsa: failed to generate key pair\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
