@@ -352,7 +352,8 @@ ssh_ml_dsa_encode_store_sig(
     const u_char *sig,
     size_t sig_len,
     u_char **sigp,
-    size_t *lenp
+    size_t *lenp,
+    char *alg
 ) {
     struct sshbuf *b = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -364,7 +365,8 @@ ssh_ml_dsa_encode_store_sig(
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
-    if ((r = sshbuf_put_cstring(b, "ssh-ml-dsa")) != 0 ||
+
+    if ((r = sshbuf_put_cstring(b, alg)) != 0 ||
 	    (r = sshbuf_put_string(b, sig, sig_len)) != 0) {
             debug3_f("ml-dsa: Failed putting signature in buffer\n");
             goto out;
@@ -403,8 +405,10 @@ ssh_ml_dsa_sign(
 ) {
     size_t sig_len;
     u_char *sig = NULL;
+    char *signature_type = NULL;
     EVP_PKEY_CTX *sctx = NULL;
     EVP_SIGNATURE *sig_alg = NULL;
+    int type = -1;
     int r = SSH_ERR_INTERNAL_ERROR;
     debug3_f("Siging using ml-dsa\n");
 
@@ -424,7 +428,26 @@ ssh_ml_dsa_sign(
         goto out;
     }
 
-    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
+    type = ssh_ml_dsa_size(key);
+    switch (type) { // Numbers are the FIPS 204 Security parameter set numbers
+        case 2:
+            signature_type = "ML-DSA-44";
+            break;
+        case 3:
+            signature_type = "ML-DSA-65";
+            break;
+        case 5:
+            signature_type = "ML-DSA-87";
+            break;
+    
+        default: // some error has happened
+            debug3_f("not possible to get parameter set for given ml-dsa key");
+            r = SSH_ERR_LIBCRYPTO_ERROR;
+            goto out;
+    }
+
+    
+    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, signature_type, NULL)) == NULL) {
         debug3_f("ml-dsa: failed fetching signature algorithm\n");
         r = SSH_ERR_SIGN_ALG_UNSUPPORTED;
         goto out;
@@ -452,7 +475,7 @@ ssh_ml_dsa_sign(
         goto out;
     }
 
-    if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp)) != 0) {
+    if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp, signature_type)) != 0) {
         debug3_f("ml-dsa: signature encoding/storing failed\n");
         goto out;
     }
@@ -490,25 +513,7 @@ ssh_ml_dsa_verify(
         OSSL_PARAM_octet_string("context-string", (u_char *) "A context string", 16),
         OSSL_PARAM_END
     };
-
-    if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
-        debug3_f("ml-dsa: failed creating context from pkey\n");
-        r = SSH_ERR_LIBCRYPTO_ERROR;
-        goto out;
-    }
-
-    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, "ML-DSA-44", NULL)) == NULL) {
-        debug3_f("ml-dsa: failed fetching signature algorithm\n");
-        r = SSH_ERR_LIBCRYPTO_ERROR;
-        goto out;
-    }
-
-    if (!EVP_PKEY_verify_message_init(ctx, sig_alg, params)) {
-        debug3_f("ml-dsa: Context initialization failed\n");
-        r = SSH_ERR_LIBCRYPTO_ERROR;
-        goto out;
-    }
-
+    
     if ((b = sshbuf_from(sig, siglen)) == NULL) {
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
@@ -522,6 +527,24 @@ ssh_ml_dsa_verify(
     
     if (sshbuf_get_string(b, &signature, &siglen) != 0) {
         r = SSH_ERR_INVALID_FORMAT;
+        goto out;
+    }
+    
+    if ((ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key->pkey, NULL)) == NULL) {
+        debug3_f("ml-dsa: failed creating context from pkey\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+    
+    if ((sig_alg = EVP_SIGNATURE_fetch(NULL, signature_type, NULL)) == NULL) {
+        debug3_f("ml-dsa: failed fetching signature algorithm\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
+
+    if (!EVP_PKEY_verify_message_init(ctx, sig_alg, params)) {
+        debug3_f("ml-dsa: Context initialization failed\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
     

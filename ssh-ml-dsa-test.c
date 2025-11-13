@@ -196,24 +196,26 @@ int ml_dsa_signature_generation(int bits) {
         goto out;
     }
     
-    if ((r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
+    if ((r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) == 0) {
         // Signature generated. check if sigtype is inserted correctly at the start
         struct sshbuf *b = NULL;
         char *signature_type = NULL;
+        char *expected_signature_type;
+        asprintf(&expected_signature_type, "ML-DSA-%d", bits);
         if ((b = sshbuf_from(sig, siglen)) == NULL) {
             r = SSH_ERR_ALLOC_FAIL;
             goto out_sig_generated;
         }
 
         if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
-            printf("ml-dsa: Failed getting signature type from buffer\n");
+            fprintf(stderr, "ml-dsa: Failed getting signature type from buffer\n");
             r = SSH_ERR_INVALID_FORMAT;
             goto out_sig_generated;
         }
 
-        if ((r = strcmp("ssh-ml-dsa", signature_type)) != 0) {
-            // Should never happen
-            printf("ml-dsa: signature type incorrect\n");
+        if (strcmp(expected_signature_type, signature_type) != 0) {
+            fprintf(stderr, "Signature type is not what was expected\n");
+            r = SSH_ERR_INVALID_FORMAT;
             goto out_sig_generated;
         }
       
@@ -240,13 +242,13 @@ int ml_dsa_signature_verification(int bits) {
     }
 
     if ((r = ssh_ml_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
-        printf("Failed signature generation for ml-dsa-%d when trying to generate for verification\n", bits);
+        fprintf(stderr, "Failed signature generation for ml-dsa-%d when trying to generate for verification\n", bits);
         goto out;
     }
     
     if ((r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
-        printf("Error code: %d\n", r);
-        printf("Error: %s\n", ssh_err(r));
+        fprintf(stderr, "Error code: %d\n", r);
+        fprintf(stderr, "Error: %s\n", ssh_err(r));
     }
 
   out:
@@ -254,7 +256,7 @@ int ml_dsa_signature_verification(int bits) {
     return r;
 }
 
-int ml_dsa_signature_verification_should_fail(int bits) {
+int ml_dsa_signature_verification_different_data(int bits) {
     u_char *sig = NULL;
     size_t siglen; // will be overwritten by the signing function
     u_char *data_signed = "Take your MEDS";
@@ -270,13 +272,13 @@ int ml_dsa_signature_verification_should_fail(int bits) {
     }
 
     if ((r = ssh_ml_dsa_sign(key, &sig, &siglen, data_signed, datalen_signed, alg, NULL, NULL, 0)) != 0) {
-        printf("Failed signature generation for ml-dsa-%d when trying to generate for verification\n", bits);
+        fprintf(stderr, "Failed signature generation for ml-dsa-%d when trying to generate for verification\n", bits);
         goto out;
     }
     
     if ((r = ssh_ml_dsa_verify(key, sig, siglen, data_validated, datalen_validated, alg, 0, NULL)) != SSH_ERR_SIGNATURE_INVALID) {
-        printf("Error code: %d\n", r);
-        printf("Error: %s\n", ssh_err(r));
+        fprintf(stderr, "Error code: %d\n", r);
+        fprintf(stderr, "Error: %s\n", ssh_err(r));
     }
 
   out:
@@ -366,10 +368,8 @@ int ml_dsa_sshkey_sign_then_sshkey_verify(int bits) {
     return r;
 }
 
-
 int main(void) {
     int bits = 0;
-    int r = SSH_ERR_INTERNAL_ERROR;
 
     printf("STARTING ML-DSA TESTS\n");
     printf("===================================\n");
@@ -540,10 +540,27 @@ int main(void) {
         goto out;
     }
     printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d: ", bits);
+    if (ml_dsa_signature_generation(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d: ", bits);
+    if (ml_dsa_signature_generation(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
     printf("===================================\n");
     
     // KEY SIGNATURE VERIFICATION TESTS
     printf("KEY SIGNATURE VERIFICATION TESTS\n");
+    
     bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d direct verification should succeed: ", bits);
     if (ml_dsa_signature_verification(bits)) {
@@ -554,7 +571,7 @@ int main(void) {
     
     bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d direct verification should fail: ", bits);
-    if (ml_dsa_signature_verification_should_fail(bits) == 0) {
+    if (ml_dsa_signature_verification_different_data(bits) == 0) {
         printf("[x]\n");
         goto out;
     }
@@ -577,6 +594,86 @@ int main(void) {
     printf("[v]\n");
     
     bits = ML_DSA_44_BITS;
+    printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
+    if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d direct verification should succeed: ", bits);
+    if (ml_dsa_signature_verification(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d direct verification should fail: ", bits);
+    if (ml_dsa_signature_verification_different_data(bits) == 0) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d verification using direct sign, sshkey_verify: ", bits);
+    if (ml_dsa_signature_validation_using_sshkey_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d verification using sshkey_sign, direct verification: ", bits);
+    if (ml_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
+    if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d direct verification should succeed: ", bits);
+    if (ml_dsa_signature_verification(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d direct verification should fail: ", bits);
+    if (ml_dsa_signature_verification_different_data(bits) == 0) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d verification using direct sign, sshkey_verify: ", bits);
+    if (ml_dsa_signature_validation_using_sshkey_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d verification using sshkey_sign, direct verification: ", bits);
+    if (ml_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
     printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
     if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
         printf("[x]\n");
