@@ -74,7 +74,7 @@ ssh_ml_dsa_equal(
     if (a->pkey == NULL || b->pkey == NULL) {
         return 0;
     }
-    return EVP_PKEY_cmp(a->pkey, b->pkey) == 1;
+    return EVP_PKEY_eq(a->pkey, b->pkey) == 1;
 }
 
 int
@@ -91,15 +91,13 @@ ssh_ml_dsa_serialize_public(
     uint8_t *pub = NULL;
     size_t pub_len;
     
-    // TODO: Check if EVP_PKEY_get_raw_public_key could be used instead
-    // Seems to be the appropriate function to call here instead of this
-    if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, sizeof(pub), &pub_len)) {
+    if (!EVP_PKEY_get_raw_public_key(key->pkey, pub, &pub_len)) {
         debug3_f("ml-dsa: failed getting size of public key buffer\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
     
     pub = malloc(pub_len);
-    if (!EVP_PKEY_get_octet_string_param(key->pkey, "pub", pub, pub_len, &pub_len)) {
+    if (!EVP_PKEY_get_raw_public_key(key->pkey, pub, &pub_len)) {
         debug3_f("ml-dsa: failed getting public key data\n");
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
@@ -162,11 +160,7 @@ ssh_ml_dsa_deserialize_public(
         
         default: // Should never happen but just in case
             r = SSH_ERR_INTERNAL_ERROR;
-            break;
-    }
-
-    if (r != 0) {
-        goto out;
+            goto out;
     }
 
     debug3_f("creating new public key from raw key data");
@@ -265,11 +259,7 @@ ssh_ml_dsa_deserialize_private(
         
         default: // Should never happen but just in case
             r = SSH_ERR_INTERNAL_ERROR;
-            break;
-    }
-
-    if (r != 0) {
-        goto out;
+            goto out;
     }
 
     if ((new = EVP_PKEY_new_raw_private_key(type, NULL, private, private_len)) == NULL) {
@@ -330,21 +320,53 @@ ssh_ml_dsa_copy_public(
 ) {
     debug3_f("ml-dsa: copy public key\n");
     EVP_PKEY *new = NULL;
-    // TODO: Make size dependend on the ML-DSA security level and properly free the memory as well
-    uint8_t pub[1312];
+    uint8_t *pub;
     size_t pub_len;
-    if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", pub, sizeof(pub), &pub_len)) {
-        debug3_f("ml-dsa: failed getting public key from key->pkey\n");
+    int type = 0;
+    int r = SSH_ERR_INTERNAL_ERROR;
+    
+    // The required buffer size can be obtained from *out_len by calling the function with buf set to NULL
+    if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", NULL, 0, &pub_len)) {
+        debug3_f("ml-dsa: failed getting public key size from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
+    
+    pub = malloc(pub_len);
+    // The required buffer size can be obtained from *out_len by calling the function with buf set to NULL
+    if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", pub, pub_len, &pub_len)) {
+        debug3_f("ml-dsa: failed getting public key size from key->pkey\n");
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
+    }
 
-    if ((new = EVP_PKEY_new_raw_public_key(EVP_PKEY_ML_DSA_44, NULL, pub, pub_len)) == NULL) {
+    switch (pub_len) { // Key lengths from FIPS 204 document
+        case 1312:
+            type = EVP_PKEY_ML_DSA_44;
+            break;
+        case 1952:
+            type = EVP_PKEY_ML_DSA_65;
+            break;
+        case 2592:
+            type = EVP_PKEY_ML_DSA_87;
+            break;
+        default: // Should never happen as pub_len is fetched from Openssl
+            r = SSH_ERR_INTERNAL_ERROR;
+            goto out;
+    }
+
+    if ((new = EVP_PKEY_new_raw_public_key(type, NULL, pub, pub_len)) == NULL) {
         debug3_f("ml-dsa: failed creating new public key from the public key data\n");
-        return SSH_ERR_LIBCRYPTO_ERROR;
+        r = SSH_ERR_LIBCRYPTO_ERROR;
+        goto out;
     }
 
+    // Success
+    r = 0;
     to->pkey = new;
-    return 0;
+
+  out:
+    free(pub);
+    return r;
 }
 
 int

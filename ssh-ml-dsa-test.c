@@ -125,6 +125,29 @@ int key_not_equal_another_different_bits(int key_bits, int other_bits) {
     return r;
 }
 
+int copy_public_equal_to_itself(int bits) {
+    struct sshkey *from = sshkey_new(KEY_ML_DSA);
+    struct sshkey *to = sshkey_new(KEY_ML_DSA);
+    int r = SSH_ERR_INTERNAL_ERROR;
+
+    if ((r = ssh_ml_dsa_generate(from, bits)) != 0) {
+        fprintf(stderr, "Failed generating key: %d\n", r);
+        goto out;
+    }
+
+    if ((r = ssh_ml_dsa_copy_public(from, to)) != 0) {
+        fprintf(stderr, "Failed to copy public key: %d\n", r);
+        goto out;
+    }
+
+    r = ssh_ml_dsa_equal(from, to) != 1;
+
+  out:
+    sshkey_free(from);
+    sshkey_free(to);
+    return r;
+}
+
 int serialize_deserialize_pub_eq(int bits) {
     int r = SSH_ERR_INTERNAL_ERROR;
     struct sshkey *key = sshkey_new(KEY_ML_DSA);
@@ -476,6 +499,34 @@ int main(void) {
         goto out;
     }
     printf("[v]\n");
+    printf("===================================\n");
+
+    // COPY PUBLIC TESTS
+    printf("COPY PUBLIC TESTS\n");
+    bits = ML_DSA_44_BITS;
+    printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
+    if (copy_public_equal_to_itself(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_65_BITS;
+    printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
+    if (copy_public_equal_to_itself(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+    
+    bits = ML_DSA_87_BITS;
+    printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
+    if (copy_public_equal_to_itself(bits)) {
+        printf("[x]\n");
+        goto out;
+    }
+    printf("[v]\n");
+
     printf("===================================\n");
     
     // KEY (DE)SERIALIZATION TESTS
