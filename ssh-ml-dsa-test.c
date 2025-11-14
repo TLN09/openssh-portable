@@ -223,8 +223,7 @@ int ml_dsa_signature_generation(int bits) {
         // Signature generated. check if sigtype is inserted correctly at the start
         struct sshbuf *b = NULL;
         char *signature_type = NULL;
-        char *expected_signature_type;
-        asprintf(&expected_signature_type, "ML-DSA-%d", bits);
+        char *expected_signature_type = "ssh-ml-dsa";
         if ((b = sshbuf_from(sig, siglen)) == NULL) {
             r = SSH_ERR_ALLOC_FAIL;
             goto out_sig_generated;
@@ -255,7 +254,7 @@ int ml_dsa_signature_verification(int bits) {
     u_char *sig = NULL;
     size_t siglen; // will be overwritten by the signing function
     u_char *data = "Take your MEDS";
-    size_t datalen = strlen(data);
+    size_t datalen = strlen(data) + 1;
     char *alg = NULL;
     struct sshkey *key = sshkey_new(KEY_ML_DSA);
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -268,6 +267,8 @@ int ml_dsa_signature_verification(int bits) {
         fprintf(stderr, "Failed signature generation for ml-dsa-%d when trying to generate for verification\n", bits);
         goto out;
     }
+
+    fprintf(stderr, "ML-DSA-%d sig_len: %d\n", bits, siglen);
     
     if ((r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
         fprintf(stderr, "Error code: %d\n", r);

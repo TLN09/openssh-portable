@@ -374,8 +374,7 @@ ssh_ml_dsa_encode_store_sig(
     const u_char *sig,
     size_t sig_len,
     u_char **sigp,
-    size_t *lenp,
-    char *alg
+    size_t *lenp
 ) {
     struct sshbuf *b = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -388,7 +387,7 @@ ssh_ml_dsa_encode_store_sig(
         goto out;
     }
 
-    if ((r = sshbuf_put_cstring(b, alg)) != 0 ||
+    if ((r = sshbuf_put_cstring(b, "ssh-ml-dsa")) != 0 ||
 	    (r = sshbuf_put_string(b, sig, sig_len)) != 0) {
             debug3_f("ml-dsa: Failed putting signature in buffer\n");
             goto out;
@@ -497,7 +496,7 @@ ssh_ml_dsa_sign(
         goto out;
     }
 
-    if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp, signature_type)) != 0) {
+    if ((r = ssh_ml_dsa_encode_store_sig(sig, sig_len, sigp, lenp)) != 0) {
         debug3_f("ml-dsa: signature encoding/storing failed\n");
         goto out;
     }
@@ -540,15 +539,37 @@ ssh_ml_dsa_verify(
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
-
+    
     if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
         debug3_f("ml-dsa: Failed getting signature type from buffer\n");
         r = SSH_ERR_INVALID_FORMAT;
         goto out;
     }
+
+    // Don't try to validate signatures that are not ml-dsa signatures
+    if (strcmp(signature_type, "ssh-ml-dsa")) {
+        r = SSH_ERR_INVALID_ARGUMENT;
+        goto out;
+    }
+
+    switch (ssh_ml_dsa_size(key)) {
+        case 2:
+            signature_type = "ML-DSA-44";
+            break;
+        case 3:
+            signature_type = "ML-DSA-65";
+            break;
+        case 5:
+            signature_type = "ML-DSA-87";
+            break;
+        default: // 
+            r = SSH_ERR_INVALID_ARGUMENT;
+            goto out;
+    }
+
     
     if (sshbuf_get_string(b, &signature, &siglen) != 0) {
-        r = SSH_ERR_INVALID_FORMAT;
+        r = SSH_ERR_SIGNATURE_INVALID;
         goto out;
     }
     
@@ -583,7 +604,6 @@ ssh_ml_dsa_verify(
     EVP_SIGNATURE_free(sig_alg);
     EVP_PKEY_CTX_free(ctx);
     sshbuf_free(b);
-    free(signature_type);
     return r;
 }
 
