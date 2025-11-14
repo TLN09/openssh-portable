@@ -1,7 +1,0 @@
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ssh-ed25519
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.sk-ssh-ed25519@openssh.com
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp256
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp384
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ecdsa-sha2-nistp521
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.sk-ecdsa-sha2-nistp256@openssh.com
-HostKey /Users/tln/cs/masters/openssh-portable/regress/host.ssh-rsa
