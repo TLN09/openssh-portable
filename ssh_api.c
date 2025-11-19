@@ -538,6 +538,7 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 	if ((r = kex_buf2prop(ssh->kex->my, NULL, &proposal)) != 0)
 		return r;
 	orig = proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
+	debug3_f("Original hostkey proposal: %s", orig);
 	if ((oavail = avail = strdup(orig)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
@@ -549,6 +550,7 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 	}
 	*replace = '\0';
 	while ((alg = strsep(&avail, ",")) && *alg != '\0') {
+		debug3_f("alg: %s", alg);
 		if ((ktype = sshkey_type_from_name(alg)) == KEY_UNSPEC)
 			continue;
 		nid = sshkey_ecdsa_nid_from_name(alg);
