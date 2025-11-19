@@ -56,7 +56,8 @@
 	"sk-ssh-ed25519@openssh.com," \
 	"sk-ecdsa-sha2-nistp256@openssh.com," \
 	"rsa-sha2-512," \
-	"rsa-sha2-256"
+	"rsa-sha2-256" \
+	"ssh-ml-dsa"
 
 #define	KEX_SERVER_ENCRYPT \
 	"chacha20-poly1305@openssh.com," \
