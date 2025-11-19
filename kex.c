@@ -125,7 +125,7 @@ kex_proposal_populate_entries(struct ssh *ssh, char *prop[PROPOSAL_MAX],
 			prop[i] = xstrdup(comp ? comp : defprop[i]);
 			break;
 		case PROPOSAL_SERVER_HOST_KEY_ALGS:
-			debug3_f("kex_proposal: hkalgs == NULL -> %d", hkalgs ? 1 : 0);
+			debug3_f("kex_proposal: hkalgs != NULL -> %d", hkalgs ? 1 : 0);
 			prop[i] = xstrdup(hkalgs ? hkalgs : defprop[i]);
 			break;
 		default:

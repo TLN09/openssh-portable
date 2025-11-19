@@ -231,6 +231,7 @@ append_hostkey_type(struct sshbuf *b, const char *s)
 static char *
 list_hostkey_types(void)
 {
+	debug3_f("LIST HOSTKEY TYPES CALLED");
 	struct sshbuf *b;
 	struct sshkey *key;
 	char *ret;
@@ -255,6 +256,7 @@ list_hostkey_types(void)
 			append_hostkey_type(b, sshkey_ssh_name(key));
 			break;
 		case KEY_ML_DSA:
+			debug3_f("appending ml-dsa hostkey type");
 			append_hostkey_type(b, "ssh-ml-dsa");
 			break;
 		}
