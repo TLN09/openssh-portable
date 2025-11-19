@@ -279,6 +279,8 @@ match_list(const char *client, const char *server, u_int *next)
 
 	c = cp = xstrdup(client);
 	s = sp = xstrdup(server);
+	debug3_f("Client proposed algorithms: %s", c);
+	debug3_f("Server proposed algorithms: %s", s);
 
 	for ((p = strsep(&sp, SEP)), i=0; p && *p != '\0';
 	    (p = strsep(&sp, SEP)), i++) {

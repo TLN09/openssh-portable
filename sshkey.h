@@ -68,7 +68,6 @@ enum sshkey_types {
 	KEY_ED25519_SK,
 	KEY_ED25519_SK_CERT,
 	KEY_ML_DSA,
-	KEY_ML_DSA_CERT,
 	KEY_UNSPEC
 };
 

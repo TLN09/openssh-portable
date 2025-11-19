@@ -635,16 +635,4 @@ const struct sshkey_impl sshkey_ml_dsa_impl = {
 	/* .keybits = */	0,
 	/* .funcs = */		&sshkey_ml_dsa_funcs,
 };
-
-const struct sshkey_impl sshkey_ml_dsa_cert_impl = {
-	/* .name = */		"ssh-ml-dsa-cert",
-	/* .shortname = */	"ML-DSA-CERT",
-	/* .sigalg = */		NULL,
-	/* .type = */		KEY_ML_DSA_CERT,
-	/* .nid = */		0,
-	/* .cert = */		1,
-	/* .sigonly = */	0,
-	/* .keybits = */	0,
-	/* .funcs = */		&sshkey_ml_dsa_funcs,
-};
 #endif /* WITH_OPENSSL */

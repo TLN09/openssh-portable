@@ -114,7 +114,6 @@ extern const struct sshkey_impl sshkey_rsa_sha256_cert_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
 extern const struct sshkey_impl sshkey_ml_dsa_impl;
-extern const struct sshkey_impl sshkey_ml_dsa_cert_impl;
 #endif /* WITH_OPENSSL */
 
 const struct sshkey_impl * const keyimpls[] = {
