@@ -274,7 +274,6 @@ ask_filename(struct passwd *pw, const char *prompt)
 			name = _PATH_SSH_CLIENT_ID_ED25519_SK;
 			break;
 		case KEY_ML_DSA:
-		case KEY_ML_DSA_CERT:
 			name = _PATH_SSH_CLIENT_ID_ML_DSA;
 			break;
 		default:

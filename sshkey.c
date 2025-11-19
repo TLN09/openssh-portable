@@ -431,8 +431,6 @@ sshkey_type_plain(int type)
 		return KEY_ED25519;
 	case KEY_ED25519_SK_CERT:
 		return KEY_ED25519_SK;
-	case KEY_ML_DSA_CERT:
-		return KEY_ML_DSA;
 	default:
 		return type;
 	}

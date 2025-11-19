@@ -49,6 +49,8 @@
 #include "match.h"
 #include "misc.h"
 
+#include "log.h"
+
 /*
  * Returns true if the given string matches the pattern (which may contain ?
  * and * as wildcards), and zero if it does not match.
