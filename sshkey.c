@@ -146,7 +146,6 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha512_impl,
 	&sshkey_rsa_sha512_cert_impl,
 	&sshkey_ml_dsa_impl,
-	&sshkey_ml_dsa_cert_impl,
 #endif /* WITH_OPENSSL */
 	NULL
 };
@@ -454,8 +453,6 @@ sshkey_type_certified(int type)
 		return KEY_ED25519_CERT;
 	case KEY_ED25519_SK:
 		return KEY_ED25519_SK_CERT;
-	case KEY_ML_DSA:
-		return KEY_ML_DSA_CERT;
 	default:
 		return -1;
 	}
