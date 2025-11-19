@@ -1295,7 +1295,6 @@ print_config(struct connection_info *connection_info)
 int
 main(int ac, char **av)
 {
-	debug3_f("SANITY CHECK");
 	extern char *optarg;
 	extern int optind;
 	int log_stderr = 0, inetd_flag = 0, test_flag = 0, no_daemon_flag = 0;
@@ -1665,6 +1664,7 @@ main(int ac, char **av)
 		case KEY_ED25519:
 		case KEY_ECDSA_SK:
 		case KEY_ED25519_SK:
+		case KEY_ML_DSA:
 			if (have_agent || key != NULL)
 				sensitive_data.have_ssh2_key = 1;
 			break;
