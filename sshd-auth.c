@@ -254,6 +254,9 @@ list_hostkey_types(void)
 		case KEY_ED25519_SK:
 			append_hostkey_type(b, sshkey_ssh_name(key));
 			break;
+		case KEY_ML_DSA:
+			append_hostkey_type(b, "ssh-ml-dsa");
+			break;
 		}
 		/* If the private key has a cert peer, then list that too */
 		key = host_certificates[i];
