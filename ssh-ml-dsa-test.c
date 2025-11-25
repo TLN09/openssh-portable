@@ -392,31 +392,26 @@ int ml_dsa_sshkey_sign_then_sshkey_verify(int bits) {
     return r;
 }
 
-int main(void) {
-    int bits = 0;
-
-    printf("STARTING ML-DSA TESTS\n");
-    printf("===================================\n");
-    // KEY GENERATION TESTS 
+int run_key_generation_tests() {
     printf("KEY GENERATION TESTS:\n");
     printf("    Default bits: ");
     if (generate_key_default()) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     printf("    Incorrect bits: ");
     if (generate_key_incorrect_bit()) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
 
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d: ", bits);
     if (generate_key_with_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -424,7 +419,7 @@ int main(void) {
     printf("    ML-DSA-%d: ", bits);
     if (generate_key_with_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -432,19 +427,20 @@ int main(void) {
     printf("    ML-DSA-%d: ", bits);
     if (generate_key_with_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
-    printf("===================================\n");
+    return 0;
+}
 
-    // KEY EQUALITY TESTS
+int run_key_equality_tests() {
     printf("KEY EQUALITY TESTS\n");
     
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -452,7 +448,7 @@ int main(void) {
     printf("    ML-DSA-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -460,14 +456,14 @@ int main(void) {
     printf("    ML-DSA-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d not equal to another of same type: ", bits);
     if (key_not_equal_another_same_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -475,7 +471,7 @@ int main(void) {
     printf("    ML-DSA-%d not equal to another of same type: ", bits);
     if (key_not_equal_another_same_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -483,32 +479,33 @@ int main(void) {
     printf("    ML-DSA-%d not equal to another of same type: ", bits);
     if (key_not_equal_another_same_bits(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
     printf("    ML-DSA-%d not equal to ML-DSA-%d: ", ML_DSA_44_BITS, ML_DSA_65_BITS);
     if (key_not_equal_another_different_bits(ML_DSA_44_BITS, ML_DSA_65_BITS)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
 
     printf("    ML-DSA-%d not equal to ML-DSA-%d: ", ML_DSA_65_BITS, ML_DSA_87_BITS);
     if (key_not_equal_another_different_bits(ML_DSA_65_BITS, ML_DSA_87_BITS)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
-    printf("===================================\n");
+    return 0;
+}
 
-    // COPY PUBLIC TESTS
+int run_copy_public_tests() {
     printf("COPY PUBLIC TESTS\n");
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
     if (copy_public_equal_to_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -516,7 +513,7 @@ int main(void) {
     printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
     if (copy_public_equal_to_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -524,20 +521,20 @@ int main(void) {
     printf("    ML-DSA-%d equal to itself when pulic is copied: ", bits);
     if (copy_public_equal_to_itself(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
+    return 0;
+}
 
-    printf("===================================\n");
-    
-    // KEY (DE)SERIALIZATION TESTS
+int run_key_serialization_tests() {
     printf("KEY (DE)SERIALIZATION TESTS\n");
     
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -545,7 +542,7 @@ int main(void) {
     printf("    ML-DSA-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -553,7 +550,7 @@ int main(void) {
     printf("    ML-DSA-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -561,7 +558,7 @@ int main(void) {
     printf("    ML-DSA-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -569,7 +566,7 @@ int main(void) {
     printf("    ML-DSA-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -577,19 +574,20 @@ int main(void) {
     printf("    ML-DSA-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
-    printf("===================================\n");
-    
-    // KEY SIGNATURE GENERATION TESTS
+    return 0;
+}
+
+int run_signature_generation_tests() {
     printf("KEY SIGNATURE GENERATION TESTS\n");
     
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d: ", bits);
     if (ml_dsa_signature_generation(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -597,7 +595,7 @@ int main(void) {
     printf("    ML-DSA-%d: ", bits);
     if (ml_dsa_signature_generation(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -605,19 +603,20 @@ int main(void) {
     printf("    ML-DSA-%d: ", bits);
     if (ml_dsa_signature_generation(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
-    printf("===================================\n");
-    
-    // KEY SIGNATURE VERIFICATION TESTS
+    return 0;
+}
+
+int run_signature_verification_tests() {
     printf("KEY SIGNATURE VERIFICATION TESTS\n");
     
-    bits = ML_DSA_44_BITS;
+    int bits = ML_DSA_44_BITS;
     printf("    ML-DSA-%d direct verification should succeed: ", bits);
     if (ml_dsa_signature_verification(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -625,7 +624,7 @@ int main(void) {
     printf("    ML-DSA-%d direct verification should fail: ", bits);
     if (ml_dsa_signature_verification_different_data(bits) == 0) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
 
@@ -633,7 +632,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using direct sign, sshkey_verify: ", bits);
     if (ml_dsa_signature_validation_using_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -641,7 +640,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, direct verification: ", bits);
     if (ml_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -649,7 +648,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
     if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -657,7 +656,7 @@ int main(void) {
     printf("    ML-DSA-%d direct verification should succeed: ", bits);
     if (ml_dsa_signature_verification(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -665,7 +664,7 @@ int main(void) {
     printf("    ML-DSA-%d direct verification should fail: ", bits);
     if (ml_dsa_signature_verification_different_data(bits) == 0) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
 
@@ -673,7 +672,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using direct sign, sshkey_verify: ", bits);
     if (ml_dsa_signature_validation_using_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -681,7 +680,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, direct verification: ", bits);
     if (ml_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -689,7 +688,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
     if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -697,7 +696,7 @@ int main(void) {
     printf("    ML-DSA-%d direct verification should succeed: ", bits);
     if (ml_dsa_signature_verification(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -705,7 +704,7 @@ int main(void) {
     printf("    ML-DSA-%d direct verification should fail: ", bits);
     if (ml_dsa_signature_verification_different_data(bits) == 0) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
 
@@ -713,7 +712,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using direct sign, sshkey_verify: ", bits);
     if (ml_dsa_signature_validation_using_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -721,7 +720,7 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, direct verification: ", bits);
     if (ml_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
     
@@ -729,17 +728,55 @@ int main(void) {
     printf("    ML-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
     if (ml_dsa_sshkey_sign_then_sshkey_verify(bits)) {
         printf("[x]\n");
-        goto out;
+        return 1;
     }
     printf("[v]\n");
+    return 0;
+}
+
+int run_tests() {
+    printf("STARTING ML-DSA TESTS\n");
+    printf("===================================\n");
+    if (run_key_generation_tests()) {
+        return 1;
+    }
+    
+    printf("===================================\n");
+    if (run_key_equality_tests()) {
+        return 1;
+    }
+    
+    printf("===================================\n");
+    if (run_copy_public_tests()) {
+        return 1;
+    }
+    
+    printf("===================================\n");
+    if (run_key_serialization_tests()) {
+        return 1;
+    }
+    
+    printf("===================================\n");
+    if (run_signature_generation_tests()) {
+        return 1;
+    }
+    
+    printf("===================================\n");
+    if (run_signature_verification_tests()) {
+        return 1;
+    }
 
 
     printf("===================================\n");
     printf("All Tests Passed!\n");
     return 0;
+}
 
-  out:
-  printf("===================================\n");
-    printf("Failed. Check output above for specific test\n");
-    return 1;
+int main(void) {
+    if (run_tests()) {
+        printf("===================================\n");
+        printf("A test failed. Check log for details.\n");
+        return 1;
+    }
+    return 0;
 }
