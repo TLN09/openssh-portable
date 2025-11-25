@@ -1,0 +1,1 @@
+make ssh-ml-dsa-bench && clear && ./ssh-ml-dsa-bench

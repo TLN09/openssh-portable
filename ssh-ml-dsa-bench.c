@@ -1,13 +1,14 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "ssh-ml-dsa.h"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
 #ifndef ITERATIONS
-#define ITERATIONS (2048)
+#define ITERATIONS (10000)
 #endif
 
 /* C99 types */
@@ -151,19 +152,13 @@ typedef unsigned long u32;
 
 /* Function signatures */
 NOINLINE static int do_nothing(void);
-NOINLINE static int do_something(void);
+NOINLINE static int key_generation(struct sshkey *, int);
+NOINLINE static int signing(struct sshkey *key, u_char **sigp, size_t *lenp, const u_char *data, size_t datalen);
+NOINLINE static int verification(const struct sshkey *key, const u_char *sig, size_t siglen, const u_char *data, size_t datalen); 
 static void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * min, LONGDOUBLE * max, LONGDOUBLE * mean, LONGDOUBLE * variance);
 /* End function signatures */
 
 int do_nothing() {
-    int r;
-
-    ZERO_REGISTER(r);
-
-    return r;
-}
-
-int do_something() {
     int r;
 
     ZERO_REGISTER(r);
@@ -194,6 +189,144 @@ void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const m
     if (NULL != max) *max = max_;
     if (NULL != mean) *mean = mean_;
     if (NULL != variance) *variance = variance_;
+}
+
+int key_generation(struct sshkey *k, int bits) {
+    int r;
+    
+    r = ssh_ml_dsa_generate(k, bits);
+    
+    return r;
+}
+
+int benchmark_keygeneration(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_generation(key, bits);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int signing(struct sshkey *key,
+    u_char **sigp,
+    size_t *lenp,
+    const u_char *data,
+    size_t datalen
+) {
+    int r;
+
+    r = ssh_ml_dsa_sign(key, sigp, lenp, data, datalen, NULL, NULL, NULL, 0);
+    
+    return r;
+}
+
+int benchmark_signing(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Signing", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        ssh_ml_dsa_generate(key, bits);
+        u_char *sig = NULL;
+        size_t siglen; // will be overwritten by the signing function
+        u_char *data = "Take your MEDS";
+        size_t datalen = strlen(data);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = signing(key, &sig, &siglen, data, datalen);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+        free(sig);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int verification(
+    const struct sshkey *key,
+    const u_char *sig, 
+    size_t siglen,
+    const u_char *data, 
+    size_t datalen
+) {
+    int r;
+
+    r = ssh_ml_dsa_verify(key, sig, siglen, data, datalen, NULL, 0, NULL);
+    
+    return r;
+}
+
+int benchmark_verification(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Verification", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        ssh_ml_dsa_generate(key, bits);
+        u_char *sig = NULL;
+        size_t siglen; // will be overwritten by the signing function
+        u_char *data = "Take your MEDS";
+        size_t datalen = strlen(data);
+        signing(key, &sig, &siglen, data, datalen);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = verification(key, sig, siglen, data, datalen);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+        free(sig);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -228,28 +361,20 @@ int main(int argc, char **argv) {
             }
         }
         compute_statistics(deltas, k, &min, &max, &mean, &variance);
-        printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", "NULL", min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+        printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", "NULL", min, max, mean, sqrt(variance), (SIZE_T_FMT_TYPE)k);
     }
 
-    /* Something */
-    {
-        printf("[%s] Starting benchmark\n", "NULL");
-        for(j = 0, k = 0; j < ITERATIONS; j++) {
-            START_MEASUREMENT(cycles_high_s, cycles_low_s);
-            ret = do_something();
-            if (likely(0 == ret)) {
-                END_MEASUREMENT(cycles_high_e, cycles_low_e);
-                start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
-                end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
-                deltas[k++] = end - start;
-            } else {
-                fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", "NULL");
-                printf("[%s] ERROR\n", "NULL");
-            }
-        }
-        compute_statistics(deltas, k, &min, &max, &mean, &variance);
-        printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", "NULL", min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
-    }
+    benchmark_keygeneration(ML_DSA_44_BITS, deltas);
+    benchmark_keygeneration(ML_DSA_65_BITS, deltas);
+    benchmark_keygeneration(ML_DSA_87_BITS, deltas);
+
+    benchmark_signing(ML_DSA_44_BITS, deltas);
+    benchmark_signing(ML_DSA_65_BITS, deltas);
+    benchmark_signing(ML_DSA_87_BITS, deltas);
+
+    benchmark_verification(ML_DSA_44_BITS, deltas);
+    benchmark_verification(ML_DSA_65_BITS, deltas);
+    benchmark_verification(ML_DSA_87_BITS, deltas);
 
     free(deltas);
 

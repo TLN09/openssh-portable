@@ -13,6 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef SSH_ML_DSA_H
+#define SSH_ML_DSA_H
+
+#define ML_DSA_44_BITS 44
+#define ML_DSA_65_BITS 65
+#define ML_DSA_87_BITS 87
+
 
 #include "includes.h"
 
@@ -121,3 +128,4 @@ ssh_ml_dsa_verify(
 );
 
 #endif /* WITH_OPENSSL */
+#endif /* SSH_ML_DSA_H */

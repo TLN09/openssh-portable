@@ -1,0 +1,84 @@
+Trying libcrypto /home/tln/tools/SQLiteStudio/lib/libcrypto.so.1.1
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/ccfvaQav.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /home/tln/tools/openssl/libcrypto.so.3
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/cc4mpiU5.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /home/tln/tools/openssl/libcrypto.so
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/ccv0wgVT.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /snap/core22/2045/usr/lib/x86_64-linux-gnu/libcrypto.so.3
+gcc: /snap/core22/2045/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.36' not found (required by gcc)
+gcc: /snap/core22/2045/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by gcc)
+Trying libcrypto /snap/core22/2139/usr/lib/x86_64-linux-gnu/libcrypto.so.3
+gcc: /snap/core22/2139/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.36' not found (required by gcc)
+gcc: /snap/core22/2139/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by gcc)
+Trying libcrypto /snap/core20/2682/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.35' not found (required by gcc)
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.32' not found (required by gcc)
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.33' not found (required by gcc)
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.36' not found (required by gcc)
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by gcc)
+gcc: /snap/core20/2682/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by gcc)
+Trying libcrypto /snap/core20/2669/usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.35' not found (required by gcc)
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.32' not found (required by gcc)
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.33' not found (required by gcc)
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.36' not found (required by gcc)
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by gcc)
+gcc: /snap/core20/2669/usr/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found (required by gcc)
+Trying libcrypto /usr/lib/x86_64-linux-gnu/libcrypto.so.3
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/ccdVIzyq.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /usr/local/lib64/libcrypto.so.3
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/ccTLLXKe.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /usr/local/lib64/libcrypto.so
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/cc3YkSxy.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /home/tln/tools/openssl/libcrypto.a
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/cctjL5e3.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status
+Trying libcrypto /usr/local/lib64/libcrypto.a
+conftest.c: In function ‘main’:
+conftest.c:2:32: warning: implicit declaration of function ‘SSLeay’ [-Wimplicit-function-declaration]
+    2 | int main(){printf("0x%08xL\n", SSLeay());}
+      |                                ^~~~~~
+/usr/bin/ld: /tmp/cc0CgkUc.o: in function `main':
+conftest.c:(.text+0xe): undefined reference to `SSLeay'
+collect2: error: ld returned 1 exit status

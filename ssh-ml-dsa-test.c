@@ -5,10 +5,6 @@
 #include "ssherr.h"
 #include "ssh-ml-dsa.h"
 
-#define ML_DSA_44_BITS 44
-#define ML_DSA_65_BITS 65
-#define ML_DSA_87_BITS 87
-
 int generate_key_default() {
     struct sshkey *key = sshkey_new(KEY_ML_DSA);
     int r = ssh_ml_dsa_generate(key, 0);
