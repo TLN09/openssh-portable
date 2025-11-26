@@ -153,6 +153,10 @@ typedef unsigned long u32;
 /* Function signatures */
 NOINLINE static int do_nothing(void);
 NOINLINE static int key_generation(struct sshkey *, int);
+NOINLINE static int key_serialization_private(struct sshkey *, struct sshbuf *, enum sshkey_serialize_rep);
+NOINLINE static int key_serialization_public(struct sshkey *, struct sshbuf *, enum sshkey_serialize_rep);
+NOINLINE static int key_deserialization_private(struct sshkey *, struct sshbuf *);
+NOINLINE static int key_deserialization_public(struct sshkey *, struct sshbuf *);
 NOINLINE static int signing(struct sshkey *key, u_char **sigp, size_t *lenp, const u_char *data, size_t datalen);
 NOINLINE static int verification(const struct sshkey *key, const u_char *sig, size_t siglen, const u_char *data, size_t datalen); 
 static void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * min, LONGDOUBLE * max, LONGDOUBLE * mean, LONGDOUBLE * variance);
@@ -228,6 +232,169 @@ int benchmark_keygeneration(int bits, u64 *deltas) {
     free(type);
     return 0;
 }
+
+int key_serialization_private(struct sshkey *k, struct sshbuf *buffer, enum sshkey_serialize_rep options) {
+    int r;
+    
+    r = ssh_ml_dsa_serialize_private(k, buffer, options);
+    
+    return r;
+}
+
+int benchmark_serialization_private(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_serialization_private(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_serialization_public(struct sshkey *k, struct sshbuf *buffer, enum sshkey_serialize_rep options) {
+    int r;
+    
+    r = ssh_ml_dsa_serialize_public(k, buffer, options);
+    
+    return r;
+}
+
+int benchmark_serialization_public(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_serialization_public(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_deserialization_private(struct sshkey *k, struct sshbuf *buffer) {
+    int r;
+    
+    r = ssh_ml_dsa_deserialize_private("ssh-ml-dsa", buffer, k);
+    
+    return r;
+}
+
+int benchmark_deserialization_private(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        key_serialization_private(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_deserialization_private(key, buffer);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_deserialization_public(struct sshkey *k, struct sshbuf *buffer) {
+    int r;
+    
+    r = ssh_ml_dsa_deserialize_public("ssh-ml-dsa", buffer, k);
+    
+    return r;
+}
+
+int benchmark_deserialization_public(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        key_serialization_public(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_deserialization_public(key, buffer);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &variance);
+    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
 
 int signing(struct sshkey *key,
     u_char **sigp,
@@ -367,6 +534,22 @@ int main(int argc, char **argv) {
     benchmark_keygeneration(ML_DSA_44_BITS, deltas);
     benchmark_keygeneration(ML_DSA_65_BITS, deltas);
     benchmark_keygeneration(ML_DSA_87_BITS, deltas);
+    
+    benchmark_serialization_private(ML_DSA_44_BITS, deltas);
+    benchmark_serialization_private(ML_DSA_65_BITS, deltas);
+    benchmark_serialization_private(ML_DSA_87_BITS, deltas);
+    
+    benchmark_serialization_public(ML_DSA_44_BITS, deltas);
+    benchmark_serialization_public(ML_DSA_65_BITS, deltas);
+    benchmark_serialization_public(ML_DSA_87_BITS, deltas);
+    
+    benchmark_deserialization_private(ML_DSA_44_BITS, deltas);
+    benchmark_deserialization_private(ML_DSA_65_BITS, deltas);
+    benchmark_deserialization_private(ML_DSA_87_BITS, deltas);
+    
+    benchmark_deserialization_public(ML_DSA_44_BITS, deltas);
+    benchmark_deserialization_public(ML_DSA_65_BITS, deltas);
+    benchmark_deserialization_public(ML_DSA_87_BITS, deltas);
 
     benchmark_signing(ML_DSA_44_BITS, deltas);
     benchmark_signing(ML_DSA_65_BITS, deltas);
