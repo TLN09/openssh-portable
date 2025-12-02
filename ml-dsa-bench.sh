@@ -1,1 +1,3 @@
-make ssh-ml-dsa-bench && clear && ./ssh-ml-dsa-bench
+make ssh-ml-dsa-bench && \
+clear && \
+taskset -c 0 ./ssh-ml-dsa-bench > res.csv

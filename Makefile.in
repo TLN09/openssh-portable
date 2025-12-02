@@ -268,8 +268,8 @@ sftp$(EXEEXT): $(LIBCOMPAT) libssh.a $(SFTP_OBJS)
 ssh-ml-dsa-test: $(LIBCOMPAT) libssh.a $(SSH_ML_DSA_TEST_OBJ)
 	$(LD) -o $@ $(SSH_ML_DSA_TEST_OBJ) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
 
-ssh-ml-dsa-test: $(LIBCOMPAT) libssh.a $(SSH_ML_DSA_BENCH_OBJ)
-	$(LD) -o $@ $(SSH_ML_DSA_BENCH_OBJ) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
+ssh-ml-dsa-bench: $(LIBCOMPAT) libssh.a $(SSH_ML_DSA_BENCH_OBJ)
+	$(LD) -o $@ $(SSH_ML_DSA_BENCH_OBJ) $(LDFLAGS) -lm -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
 
 # test driver for the loginrec code - not built by default
 logintest: logintest.o $(LIBCOMPAT) libssh.a loginrec.o
