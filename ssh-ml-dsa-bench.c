@@ -159,7 +159,7 @@ NOINLINE static int key_deserialization_private(struct sshkey *, struct sshbuf *
 NOINLINE static int key_deserialization_public(struct sshkey *, struct sshbuf *);
 NOINLINE static int signing(struct sshkey *key, u_char **sigp, size_t *lenp, const u_char *data, size_t datalen);
 NOINLINE static int verification(const struct sshkey *key, const u_char *sig, size_t siglen, const u_char *data, size_t datalen); 
-static void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * min, LONGDOUBLE * max, LONGDOUBLE * mean, LONGDOUBLE * variance);
+void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const min, LONGDOUBLE * const max, LONGDOUBLE * const mean, LONGDOUBLE * const median, LONGDOUBLE * const variance);
 /* End function signatures */
 
 int do_nothing() {
@@ -170,10 +170,26 @@ int do_nothing() {
     return r;
 }
 
-void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const min, LONGDOUBLE * const max, LONGDOUBLE * const mean, LONGDOUBLE * const variance) {
-    LONGDOUBLE sum1 = 0.0L, sum2 = 0.0L, mean_, variance_, min_ = (LONGDOUBLE)INFINITY, max_ = (LONGDOUBLE) -INFINITY;
+int cmp(const void *a, const void *b) {
+    u64 x = *(u64 *)a;
+    u64 y = *(u64 *)b;
+    if (x > y) {
+        return 1;
+    }
+    
+    if (x == y) {
+        return 0;
+    }
+    
+    return -1;
+}
+
+void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const min, LONGDOUBLE * const max, LONGDOUBLE * const mean, LONGDOUBLE * const median, LONGDOUBLE * const variance) {
+    LONGDOUBLE sum1 = 0.0L, sum2 = 0.0L, mean_, median_, variance_, min_ = (LONGDOUBLE)INFINITY, max_ = (LONGDOUBLE) -INFINITY;
     size_t i;
 
+    qsort(data, len, sizeof(u64), &cmp);
+    
     for (i = 0; i < len; i++) {
         LONGDOUBLE const t = (LONGDOUBLE) data[i];
         sum1 += t;
@@ -182,6 +198,7 @@ void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const m
     }
 
     mean_ = sum1 / (LONGDOUBLE) len;
+    median_ = data[len/2];
 
     for (i = 0; i < len; i++) {
         sum2 += powl((LONGDOUBLE)data[i] - mean_, 2);
@@ -192,6 +209,7 @@ void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const m
     if (NULL != min) *min = min_;
     if (NULL != max) *max = max_;
     if (NULL != mean) *mean = mean_;
+    if (NULL != median) *median = median_;
     if (NULL != variance) *variance = variance_;
 }
 
@@ -206,7 +224,7 @@ int key_generation(struct sshkey *k, int bits) {
 int benchmark_keygeneration(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
@@ -227,8 +245,8 @@ int benchmark_keygeneration(int bits, u64 *deltas) {
         }
         sshkey_free(key);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -244,12 +262,12 @@ int key_serialization_private(struct sshkey *k, struct sshbuf *buffer, enum sshk
 int benchmark_serialization_private(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
     char *type;
-    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    asprintf(&type, "ML-DSA-%d Serialization Private", bits);
     for(j = 0, k = 0; j < ITERATIONS; j++) {
         struct sshkey *key = sshkey_new(KEY_ML_DSA);
         struct sshbuf *buffer = sshbuf_new();
@@ -267,8 +285,8 @@ int benchmark_serialization_private(int bits, u64 *deltas) {
         }
         sshkey_free(key);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -284,12 +302,12 @@ int key_serialization_public(struct sshkey *k, struct sshbuf *buffer, enum sshke
 int benchmark_serialization_public(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
     char *type;
-    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    asprintf(&type, "ML-DSA-%d Serialization Public", bits);
     for(j = 0, k = 0; j < ITERATIONS; j++) {
         struct sshkey *key = sshkey_new(KEY_ML_DSA);
         struct sshbuf *buffer = sshbuf_new();
@@ -307,8 +325,8 @@ int benchmark_serialization_public(int bits, u64 *deltas) {
         }
         sshkey_free(key);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -324,12 +342,12 @@ int key_deserialization_private(struct sshkey *k, struct sshbuf *buffer) {
 int benchmark_deserialization_private(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
     char *type;
-    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    asprintf(&type, "ML-DSA-%d Deserialization Private", bits);
     for(j = 0, k = 0; j < ITERATIONS; j++) {
         struct sshkey *key = sshkey_new(KEY_ML_DSA);
         struct sshbuf *buffer = sshbuf_new();
@@ -348,8 +366,8 @@ int benchmark_deserialization_private(int bits, u64 *deltas) {
         }
         sshkey_free(key);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -365,12 +383,12 @@ int key_deserialization_public(struct sshkey *k, struct sshbuf *buffer) {
 int benchmark_deserialization_public(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
     char *type;
-    asprintf(&type, "ML-DSA-%d Key Generation", bits);
+    asprintf(&type, "ML-DSA-%d Deserialization Public", bits);
     for(j = 0, k = 0; j < ITERATIONS; j++) {
         struct sshkey *key = sshkey_new(KEY_ML_DSA);
         struct sshbuf *buffer = sshbuf_new();
@@ -389,8 +407,8 @@ int benchmark_deserialization_public(int bits, u64 *deltas) {
         }
         sshkey_free(key);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -412,7 +430,7 @@ int signing(struct sshkey *key,
 int benchmark_signing(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
@@ -439,8 +457,8 @@ int benchmark_signing(int bits, u64 *deltas) {
         sshkey_free(key);
         free(sig);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -462,7 +480,7 @@ int verification(
 int benchmark_verification(int bits, u64 *deltas) {
     int ret = 0;
     size_t j, k;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u64 start, end;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
 
@@ -490,8 +508,8 @@ int benchmark_verification(int bits, u64 *deltas) {
         sshkey_free(key);
         free(sig);
     }
-    compute_statistics(deltas, k, &min, &max, &mean, &variance);
-    printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", type, min, max, mean, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
     free(type);
     return 0;
 }
@@ -500,7 +518,7 @@ int main(int argc, char **argv) {
     int ret = 0;
     size_t j, k;
     u64 * deltas;
-    LONGDOUBLE min, max, mean, variance;
+    LONGDOUBLE min, max, mean, variance, median;
     u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
     u64 start, end;
 
@@ -510,10 +528,9 @@ int main(int argc, char **argv) {
     deltas = (u64 *) malloc(sizeof(*deltas) * ITERATIONS);
 
     WARMUP_MEASUREMENT();
-
+    printf("type,min,max,mean,median,variance,std. dev.,iterations\n");
     /* Nothing */
     {
-        printf("[%s] Starting benchmark\n", "NULL");
         for(j = 0, k = 0; j < ITERATIONS; j++) {
             START_MEASUREMENT(cycles_high_s, cycles_low_s);
             ret = do_nothing();
@@ -527,8 +544,8 @@ int main(int argc, char **argv) {
                 printf("[%s] ERROR\n", "NULL");
             }
         }
-        compute_statistics(deltas, k, &min, &max, &mean, &variance);
-        printf("[%s]\t [%" LONGDOUBLE_FMT "e - %" LONGDOUBLE_FMT "e] mean: %" LONGDOUBLE_FMT "e (std. dev.: %" LONGDOUBLE_FMT "e) N:%" SIZE_T_FMT "u\n", "NULL", min, max, mean, sqrt(variance), (SIZE_T_FMT_TYPE)k);
+        compute_statistics(deltas, k, &min, &max, &mean, &variance, &median);
+        printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", "NULL", min, max, mean, median, variance, sqrt(variance), (SIZE_T_FMT_TYPE)k);
     }
 
     benchmark_keygeneration(ML_DSA_44_BITS, deltas);
