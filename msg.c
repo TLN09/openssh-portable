@@ -47,6 +47,7 @@ ssh_msg_send(int fd, u_char type, struct sshbuf *m)
 	u_char buf[5];
 	u_int mlen = sshbuf_len(m);
 
+	debug3("ssh_msg_send entering");
 	debug3_f("type %u len %zu", (unsigned int)type & 0xff, sshbuf_len(m));
 
 	put_u32(buf, mlen + 1);
