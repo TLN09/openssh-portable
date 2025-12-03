@@ -2869,9 +2869,12 @@ sshpkt_msg_ignore(struct ssh *ssh, u_int nbytes)
 int
 sshpkt_send(struct ssh *ssh)
 {
+	debug3_f("SENDING PACKET");
 	if (ssh->state && ssh->state->mux)
 		return ssh_packet_send_mux(ssh);
-	return ssh_packet_send2(ssh);
+	int r = ssh_packet_send2(ssh);
+	debug3_f("PAKCET SENT WITH RETURN CODE: %d", r);
+	return r;
 }
 
 int
