@@ -101,107 +101,6 @@
 
 #define PACKET_MAX_SIZE (256 * 1024)
 
-/* Compatibility */
-#if !defined(__has_attribute) /* Clang & newer GCC */
-#define __has_attribute(x) 0
-#endif /* !defined(__has_attribute) */
-
-#if !defined(__has_builtin) /* Clang */
-#define __has_builtin(x) 0
-#endif /* !defined(__has_builtin) */
-
-#if !defined(INFINITY)
-#define INFINITY ((double) 1.0e120)
-#endif
-
-#if defined(_MSC_VER) /* MSVC-specific */
-#define NOINLINE __declspec(noinline) /* MSVC extension */
-#elif __has_attribute(__noinline__) || (defined(__GNUC__) && (__GNUC__ > 3) || (__GNUC__ == 3 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 1))
-#define NOINLINE __attribute__ ((noinline)) /* GNU extension */
-#else
-#define NOINLINE /* not supported */
-#endif /* defined(_MSC_VER) */
-
-#if __has_builtin(__builtin_expect) || (defined(__GNUC__) && (__GNUC__ > 3) || (__GNUC__ == 3 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 1))
-#define likely(x) __builtin_expect((x),1) /* GNU extension */
-#else
-#define likely(x) x
-#endif /* __has_builtin(__builtin_expect) */
-
-#if defined(_MSC_VER) /* MSVC inline assembler */
-#if !defined(intel) /* Use LFENCE for Intel processors and MFENCE for other manufacturers */
-#define xFENCE __asm _emit 0x0f __asm _emit 0xae __asm _emit 0xf0 /* MFENCE */
-#else
-#define xFENCE __asm _emit 0x0f __asm _emit 0xae __asm _emit 0xe8 /* LFENCE */
-#endif
-#define RDTSC rdtsc
-#define RDTSCP rdtscp
-
-#define WARMUP_MEASUREMENT() __asm { \
-        xFENCE \
-       __asm RDTSC \
-        xFENCE \
-        __asm RDTSC \
-        xFENCE \
-        __asm RDTSC \
-        xFENCE \
-}
-
-#define START_MEASUREMENT(HI, LO) __asm { \
-        xFENCE \
-        __asm RDTSC \
-        __asm mov LO,eax \
-        __asm mov HI,edx \
-}
-
-#define END_MEASUREMENT(HI, LO) __asm { \
-        __asm RDTSCP \
-        xFENCE \
-        __asm mov LO,eax \
-        __asm mov HI,edx \
-}
-
-#define ZERO_REGISTER(OUT) __asm mov OUT,0
-#elif defined(__GNUC__) /* GCC-style extended asm */
-#if !defined(intel) /* Use LFENCE for Intel processors and MFENCE for other manufacturers */
-#define xFENCE ".byte 0x0f, 0xae, 0xf0\n" /* MFENCE */
-#else
-#define xFENCE ".byte 0x0f, 0xae, 0xe8\n" /* LFENCE */
-#endif
-#define RDTSC ".byte 0x0f, 0x31\n"        /* RDTSC */
-#define RDTSCP ".byte 0x0f, 0x01, 0xf9\n" /* RDTSCP */
-
-#define WARMUP_MEASUREMENT() __asm__ volatile ( \
-        xFENCE \
-        RDTSC \
-        xFENCE \
-        RDTSC \
-        xFENCE \
-        RDTSC \
-        xFENCE \
-        : : : "%eax", "%edx", "memory" \
-)
-
-#define START_MEASUREMENT(HI, LO) __asm__ volatile ( \
-        xFENCE \
-        RDTSC \
-        : "=d" (HI), "=a" (LO) : : "memory" \
-)
-
-#define END_MEASUREMENT(HI, LO) __asm__ volatile ( \
-        RDTSCP \
-        xFENCE \
-        : "=d" (HI), "=a" (LO) : : "%ecx", "memory" \
-)
-#define ZERO_REGISTER(OUT) __asm__ volatile ("xor %0, %0" : "=r"(OUT) : : )
-#else /* Unsupported compiler. */
-#define WARMUP_MEASUREMENT() /* */
-#define START_MEASUREMENT(HI, LO) HI = 0; LO = 0
-#define END_MEASUREMENT(HI, LO) HI = 0; LO = 0
-#define ZERO_REGISTER(OUT) OUT = 0
-#endif /* defined(_MSC_VER) */
-
-
 struct packet_state {
 	u_int32_t seqnr;
 	u_int32_t packets;
@@ -2970,25 +2869,9 @@ sshpkt_msg_ignore(struct ssh *ssh, u_int nbytes)
 int
 sshpkt_send(struct ssh *ssh)
 {
-	int r;
-	uint64_t start, end;
-	uint32_t cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
-	if (ssh->state && ssh->state->mux) {
-		START_MEASUREMENT(cycles_high_s, cycles_low_s);
-		r = ssh_packet_send_mux(ssh);
-		END_MEASUREMENT(cycles_high_e, cycles_low_e);
-		goto out;
-	}
-	
-	START_MEASUREMENT(cycles_high_s, cycles_low_s);
-	r = ssh_packet_send2(ssh);
-	END_MEASUREMENT(cycles_high_e, cycles_low_e);
-
-  out:
-  	start = ( ((uint64_t) cycles_high_s << 040) | cycles_low_s );
-	end   = ( ((uint64_t) cycles_high_e << 040) | cycles_low_e );
-	debug_f("cycles: %d", end - start);
-	return r;
+	if (ssh->state && ssh->state->mux)
+		return ssh_packet_send_mux(ssh);
+	return ssh_packet_send2(ssh);
 }
 
 int

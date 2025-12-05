@@ -1596,6 +1596,7 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 	char *host;
 	char *server_user, *local_user;
 	int r;
+	double start, end;
 
 	local_user = xstrdup(pw->pw_name);
 	server_user = options.user ? options.user : local_user;
@@ -1620,7 +1621,11 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 	    ssh->kex->name != NULL && options.warn_weak_crypto &&
 	    !kex_is_pq_from_name(ssh->kex->name))
 		warn_nonpq_kex();
+	
+	start = monotime_double();
 	ssh_userauth2(ssh, local_user, server_user, host, sensitive);
+	end = monotime_double();
+	debug("Authentication took: %e", end - start);
 	free(local_user);
 	free(host);
 }
