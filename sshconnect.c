@@ -1622,6 +1622,8 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 	    !kex_is_pq_from_name(ssh->kex->name))
 		warn_nonpq_kex();
 	
+	
+	debug3_f("user authentication starting");
 	start = monotime_double();
 	ssh_userauth2(ssh, local_user, server_user, host, sensitive);
 	end = monotime_double();

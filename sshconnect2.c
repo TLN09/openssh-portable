@@ -461,6 +461,7 @@ ssh_userauth2(struct ssh *ssh, const char *local_user,
 	ssh_dispatch_init(ssh, &input_userauth_error);
 	ssh_dispatch_set(ssh, SSH2_MSG_EXT_INFO, kex_input_ext_info);
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_ACCEPT, &input_userauth_service_accept);
+	debug("packet sending/recieving here?");
 	ssh_dispatch_run_fatal(ssh, DISPATCH_BLOCK, &authctxt.success);	/* loop until success */
 	pubkey_cleanup(ssh);
 #ifdef GSSAPI
@@ -1461,6 +1462,8 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	if ((r = sshbuf_consume(b, skip + 1)) != 0)
 		fatal_fr(r, "consume");
 
+	double t = monotime_double();
+	dprintf(STDERR_FILENO, "auth start: %lf\n", t);
 	/* put remaining data from buffer into packet */
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_putb(ssh, b)) != 0 ||
