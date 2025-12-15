@@ -1791,8 +1791,11 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	    (r = state->hook_in(ssh, state->incoming_packet, typep,
 	    state->hook_in_ctx)) != 0)
 		return r;
-	if (*typep == SSH2_MSG_USERAUTH_SUCCESS && !state->server_side)
+	if (*typep == SSH2_MSG_USERAUTH_SUCCESS && !state->server_side) {
+		double t = monotime_double();
+		dprintf(STDERR_FILENO, "auth end: %lf\n", t);
 		r = ssh_packet_enable_delayed_compress(ssh);
+	}
 	else
 		r = 0;
 #ifdef PACKET_DEBUG

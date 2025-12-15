@@ -2616,7 +2616,6 @@ sshkey_private_deserialize_sk(struct sshbuf *buf, struct sshkey *k)
 int
 sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 {
-	debug3_f("PRIVATE deserialize called");
 	const struct sshkey_impl *impl;
 	char *tname = NULL;
 	char *expect_sk_application = NULL;
@@ -2665,7 +2664,6 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 		r = SSH_ERR_INTERNAL_ERROR;
 		goto out;
 	}
-	debug3_f("calling impl->funcs->deserialize_PRIVATE");
 	if ((r = impl->funcs->deserialize_private(tname, buf, k)) != 0)
 		goto out;
 
@@ -3188,7 +3186,6 @@ static int
 sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
-	debug3_f("PARSE PRIVATE 2");
 	char *comment = NULL;
 	int r = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *decoded = NULL, *decrypted = NULL;
@@ -3199,33 +3196,28 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
-	debug3_f("test");
 	/* Undo base64 encoding and decrypt the private section */
 	if ((r = private2_uudecode(blob, &decoded)) != 0 ||
 	    (r = private2_decrypt(decoded, passphrase,
 	    &decrypted, &pubkey)) != 0)
 		goto out;
 
-	debug3_f("test1");
 	if (type != KEY_UNSPEC &&
 	    sshkey_type_plain(type) != sshkey_type_plain(pubkey->type)) {
 		r = SSH_ERR_KEY_TYPE_MISMATCH;
 		goto out;
 	}
 
-	debug3_f("test2");
 	/* Load the private key and comment */
 	if ((r = sshkey_private_deserialize(decrypted, &k)) != 0 ||
 	    (r = sshbuf_get_cstring(decrypted, &comment, NULL)) != 0) {
 			goto out;
 	}
 
-	debug3_f("test3");
 	/* Check deterministic padding after private section */
 	if ((r = private2_check_padding(decrypted)) != 0)
 		goto out;
 
-	debug3_f("test4");
 	/* Check that the public key in the envelope matches the private key */
 	if (!sshkey_equal(pubkey, k)) {
 		r = SSH_ERR_INVALID_FORMAT;
@@ -3243,7 +3235,6 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 		comment = NULL;
 	}
  out:
-	debug3_f("OUT OF PARSE PRIVATE 2");
 	free(comment);
 	sshbuf_free(decoded);
 	sshbuf_free(decrypted);
