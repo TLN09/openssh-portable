@@ -115,6 +115,9 @@ extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
 extern const struct sshkey_impl sshkey_ml_dsa_impl;
 #endif /* WITH_OPENSSL */
+#ifdef WITH_OPEN_QUANTUM_SAFE
+extern const struct sshkey_impl sshkey_slh_dsa_impl;
+#endif /* WITH_OPEN_QUANTUM_SAFE */
 
 const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_ed25519_impl,
@@ -147,6 +150,9 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha512_cert_impl,
 	&sshkey_ml_dsa_impl,
 #endif /* WITH_OPENSSL */
+#ifdef WITH_OPEN_QUANTUM_SAFE
+	&sshkey_slh_dsa_impl,
+#endif /* WITH_OPEN_QUANTUM_SAFE */
 	NULL
 };
 

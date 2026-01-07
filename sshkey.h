@@ -49,6 +49,8 @@
 # define EVP_PKEY	void
 #define SSH_OPENSSL_VERSION "without OpenSSL"
 #endif /* WITH_OPENSSL */
+#include <oqs/oqs.h>
+#include <oqs/sig_slh_dsa.h>
 
 #define SSH_RSA_MINIMUM_MODULUS_SIZE	1024
 #define SSH_KEY_MAX_SIGN_DATA_SIZE	(1 << 20)
@@ -68,6 +70,7 @@ enum sshkey_types {
 	KEY_ED25519_SK,
 	KEY_ED25519_SK_CERT,
 	KEY_ML_DSA,
+	KEY_SLH_DSA,
 	KEY_UNSPEC
 };
 
@@ -122,6 +125,10 @@ struct sshkey {
 	int	 ecdsa_nid;	/* NID of curve */
 	/* libcrypto-backed keys */
 	EVP_PKEY *pkey;
+	/* KEY_SLH_DSA */
+	u_char *slh_dsa_pk;
+	u_char *slh_dsa_sk;
+	OQS_SIG *oqs_sig;
 	/* KEY_ED25519 and KEY_ED25519_SK */
 	u_char	*ed25519_sk;
 	u_char	*ed25519_pk;
