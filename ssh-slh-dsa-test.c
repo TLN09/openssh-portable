@@ -23,44 +23,22 @@ int generate_key_with_bits(int bits) {
     struct sshkey *key = sshkey_new(KEY_SLH_DSA);
     int r = SSH_ERR_INTERNAL_ERROR;
     if ((r = ssh_slh_dsa_generate(key, bits)) != 0) {
-        fprintf(stderr, "Failed creating key for SLH-DSA-%d\n", bits);
+        fprintf(stderr, "Failed creating key for SLH-DSA-SHA2-%ds\n", bits);
         goto out;
     }
-
-    if ((r = ssh_slh_dsa_size(key)) <= 0) {
-        // negative -> failed
-        fprintf(stderr, "Size of key not possible to get: %d\n", r);
-        goto out;
-    }
-    
-    r = 0;
 
     // valid categories:
-    //     slh-dsa-44: 2
-    //     slh-dsa-65: 3
-    //     slh-dsa-87: 5
+    //     slh-dsa-sha-128s: 128
+    //     slh-dsa-sha-192s: 192
+    //     slh-dsa-sha-256s: 256
     // Negated to get 0 on success
-    // switch (bits) {
-    //     case 0:
-    //         /* code */
-    //         r = !(r == 2);
-    //         break;
-        
-    //     case 0:
-    //         /* code */
-    //         r = !(r == 3);
-    //         break;
-        
-    //     case 0:
-    //         /* code */
-    //         r = !(r == 5);
-    //         break;
-        
-    //     default:
-    //         r = SSH_ERR_INTERNAL_ERROR;
-    //         fprintf(stderr, "bits parameter is incorrect\n");
-    //         break;
-    // }
+    char *check;
+    asprintf(&check, "SLH_DSA_PURE_SHA2_%dS", bits);
+    r = strcmp(check, key->oqs_sig->method_name);
+    if (r != 0) {
+        fprintf(stderr, "method name check failed for SLH-DSA-SHA2-%ds\n", bits);
+        fprintf(stderr, "check: %s\nmethod_name: %s\n", check, key->oqs_sig->method_name);
+    }
 
   out:
     sshkey_free(key);
@@ -275,11 +253,11 @@ int slh_dsa_signature_verification(int bits) {
     }
 
     if ((r = ssh_slh_dsa_sign(key, &sig, &siglen, data, datalen, alg, NULL, NULL, 0)) != 0) {
-        fprintf(stderr, "Failed signature generation for SLH-DSA-%d when trying to generate for verification\n", bits);
+        fprintf(stderr, "Failed signature generation for SLH-DSA-SHA2-%ds when trying to generate for verification\n", bits);
         goto out;
     }
 
-    fprintf(stderr, "SLH-DSA-%d sig_len: %d\n", bits, siglen);
+    fprintf(stderr, "SLH-DSA-SHA2-%ds sig_len: %d\n", bits, siglen);
     
     if ((r = ssh_slh_dsa_verify(key, sig, siglen, data, datalen, alg, 0, NULL)) != 0) {
         fprintf(stderr, "Error code: %d\n", r);
@@ -307,7 +285,7 @@ int slh_dsa_signature_verification_different_data(int bits) {
     }
 
     if ((r = ssh_slh_dsa_sign(key, &sig, &siglen, data_signed, datalen_signed, alg, NULL, NULL, 0)) != 0) {
-        fprintf(stderr, "Failed signature generation for SLH-DSA-%d when trying to generate for verification\n", bits);
+        fprintf(stderr, "Failed signature generation for SLH-DSA-SHA2-%ds when trying to generate for verification\n", bits);
         goto out;
     }
     
@@ -411,70 +389,57 @@ int run_key_generation_tests() {
         return 1;
     }
     printf("[v]\n");
-    // printf("    Incorrect bits: ");
-    // if (generate_key_incorrect_bit()) {
-    //     printf("[x]\n");
-    //     return 1;
-    // }
-    // printf("[v]\n");
+    printf("    Incorrect bits: ");
+    if (generate_key_incorrect_bit()) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
 
-    // int bits = 0;
-    // printf("    SLH-DSA-%d: ", bits);
-    // if (generate_key_with_bits(bits)) {
-    //     printf("[x]\n");
-    //     return 1;
-    // }
-    // printf("[v]\n");
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds: ", bits);
+        if (generate_key_with_bits(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+    }
     
-    // bits = 0;
-    // printf("    SLH-DSA-%d: ", bits);
-    // if (generate_key_with_bits(bits)) {
-    //     printf("[x]\n");
-    //     return 1;
-    // }
-    // printf("[v]\n");
-    
-    // bits = 0;
-    // printf("    SLH-DSA-%d: ", bits);
-    // if (generate_key_with_bits(bits)) {
-    //     printf("[x]\n");
-    //     return 1;
-    // }
-    // printf("[v]\n");
     return 0;
 }
 
 int run_key_equality_tests() {
     printf("KEY EQUALITY TESTS\n");
     
-    int bits = 0;
-    printf("    SLH-DSA-%d equal to itself: ", bits);
-    if (key_equal_itself(bits)) {
-        printf("[x]\n");
-        return 1;
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds equal to itself: ", bits);
+        if (key_equal_itself(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+        
+        printf("    SLH-DSA-SHA2-%ds not equal to another of same type: ", bits);
+        if (key_not_equal_another_same_bits(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
     }
-    printf("[v]\n");
-    
-    bits = 0;
-    printf("    SLH-DSA-%d not equal to another of same type: ", bits);
-    if (key_not_equal_another_same_bits(bits)) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
     
     return 0;
 }
 
 int run_copy_public_tests() {
     printf("COPY PUBLIC TESTS\n");
-    int bits = 0;
-    printf("    SLH-DSA-%d equal to itself when public is copied: ", bits);
-    if (copy_public_equal_to_itself(bits)) {
-        printf("[x]\n");
-        return 1;
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds equal to itself when public is copied: ", bits);
+        if (copy_public_equal_to_itself(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
     }
-    printf("[v]\n");
 
     return 0;
 }
@@ -482,35 +447,36 @@ int run_copy_public_tests() {
 int run_key_serialization_tests() {
     printf("KEY (DE)SERIALIZATION TESTS\n");
     
-    int bits = 0;
-    printf("    SLH-DSA-%d public (de)serialization: ", bits);
-    if (serialize_deserialize_pub_eq(bits)) {
-        printf("[x]\n");
-        return 1;
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds public (de)serialization: ", bits);
+        if (serialize_deserialize_pub_eq(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+        
+        printf("    SLH-DSA-SHA2-%ds private (de)serialization: ", bits);
+        if (serialize_deserialize_priv_eq(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
     }
-    printf("[v]\n");
-    
-    bits = 0;
-    printf("    SLH-DSA-%d private (de)serialization: ", bits);
-    if (serialize_deserialize_priv_eq(bits)) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
-    
+
     return 0;
 }
 
 int run_signature_generation_tests() {
     printf("KEY SIGNATURE GENERATION TESTS\n");
     
-    int bits = 0;
-    printf("    SLH-DSA-%d: ", bits);
-    if (slh_dsa_signature_generation(bits)) {
-        printf("[x]\n");
-        return 1;
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds: ", bits);
+        if (slh_dsa_signature_generation(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
     }
-    printf("[v]\n");
     
     return 0;
 }
@@ -518,45 +484,42 @@ int run_signature_generation_tests() {
 int run_signature_verification_tests() {
     printf("KEY SIGNATURE VERIFICATION TESTS\n");
     
-    int bits = 0;
-    printf("    SLH-DSA-%d direct verification should succeed: ", bits);
-    if (slh_dsa_signature_verification(bits)) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
-    
-    bits = 0;
-    printf("    SLH-DSA-%d direct verification should fail: ", bits);
-    if (slh_dsa_signature_verification_different_data(bits) == 0) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
+    for (int bits = 128; bits <= 256; bits += 64) {
+        printf("    SLH-DSA-SHA2-%ds direct verification should succeed: ", bits);
+        if (slh_dsa_signature_verification(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+        
+        printf("    SLH-DSA-SHA2-%ds direct verification should fail: ", bits);
+        if (slh_dsa_signature_verification_different_data(bits) == 0) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
 
-    bits = 0;
-    printf("    SLH-DSA-%d verification using direct sign, sshkey_verify: ", bits);
-    if (slh_dsa_signature_validation_using_sshkey_verify(bits)) {
-        printf("[x]\n");
-        return 1;
+        printf("    SLH-DSA-SHA2-%ds verification using direct sign, sshkey_verify: ", bits);
+        if (slh_dsa_signature_validation_using_sshkey_verify(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+        
+        printf("    SLH-DSA-SHA2-%ds verification using sshkey_sign, direct verification: ", bits);
+        if (slh_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
+        
+        printf("    SLH-DSA-SHA2-%ds verification using sshkey_sign, sshkey_verify: ", bits);
+        if (slh_dsa_sshkey_sign_then_sshkey_verify(bits)) {
+            printf("[x]\n");
+            return 1;
+        }
+        printf("[v]\n");
     }
-    printf("[v]\n");
-    
-    bits = 0;
-    printf("    SLH-DSA-%d verification using sshkey_sign, direct verification: ", bits);
-    if (slh_dsa_signing_using_sshkey_sign_direct_verify(bits)) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
-    
-    bits = 0;
-    printf("    SLH-DSA-%d verification using sshkey_sign, sshkey_verify: ", bits);
-    if (slh_dsa_sshkey_sign_then_sshkey_verify(bits)) {
-        printf("[x]\n");
-        return 1;
-    }
-    printf("[v]\n");
     
     return 0;
 }

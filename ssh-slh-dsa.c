@@ -263,8 +263,25 @@ ssh_slh_dsa_generate(
     int bits
 ) {
     int r = SSH_ERR_INTERNAL_ERROR;
+    char *type = NULL;
+    switch (bits){
+        case 0: // default bits
+        case 128:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_128s;
+            break;
+        case 192:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_192s;
+            break;
+        case 256:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_256s;
+            break;
+    
+        default:
+            r = SSH_ERR_INVALID_ARGUMENT;
+            goto out;
+    }
 
-    if ((key->oqs_sig = OQS_SIG_new(OQS_SIG_alg_slh_dsa_pure_sha2_128s)) == NULL) {
+    if ((key->oqs_sig = OQS_SIG_new(type)) == NULL) {
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
@@ -290,8 +307,8 @@ ssh_slh_dsa_generate(
   out:
     if (r != 0) {
         OQS_MEM_insecure_free(key->slh_dsa_pk);
-        OQS_MEM_secure_free(key->slh_dsa_sk, key->oqs_sig->length_secret_key);
         if (key->oqs_sig != NULL) { 
+            OQS_MEM_secure_free(key->slh_dsa_sk, key->oqs_sig->length_secret_key);
             // Documentation does not say it can be called on a null pointer
             // Better safe than sorry
             OQS_SIG_free(key->oqs_sig);
