@@ -276,6 +276,9 @@ ask_filename(struct passwd *pw, const char *prompt)
 		case KEY_ML_DSA:
 			name = _PATH_SSH_CLIENT_ID_ML_DSA;
 			break;
+		case KEY_SLH_DSA:
+			name = _PATH_SSH_CLIENT_ID_SLH_DSA;
+			break;
 		default:
 			fatal("bad key type");
 		}
@@ -3244,7 +3247,7 @@ usage(void)
 	fprintf(stderr,
 	    "usage: ssh-keygen [-q] [-a rounds] [-b bits] [-C comment] [-f output_keyfile]\n"
 	    "                  [-m format] [-N new_passphrase] [-O option]\n"
-	    "                  [-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | rsa | ml-dsa]\n"
+	    "                  [-t ecdsa | ecdsa-sk | ed25519 | ed25519-sk | rsa | ml-dsa | slh-dsa]\n"
 	    "                  [-w provider] [-Z cipher]\n"
 	    "       ssh-keygen -p [-a rounds] [-f keyfile] [-m format] [-N new_passphrase]\n"
 	    "                   [-P old_passphrase] [-Z cipher]\n"
@@ -3767,6 +3770,7 @@ main(int argc, char **argv)
 		key_type_name = DEFAULT_KEY_TYPE_NAME;
 
 	type = sshkey_type_from_shortname(key_type_name);
+	debug3_f("type: %d", type);
 	type_bits_valid(type, key_type_name, &bits);
 
 	if (!quiet)

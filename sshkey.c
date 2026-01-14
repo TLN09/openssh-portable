@@ -115,9 +115,7 @@ extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
 extern const struct sshkey_impl sshkey_ml_dsa_impl;
 #endif /* WITH_OPENSSL */
-#ifdef WITH_OPEN_QUANTUM_SAFE
 extern const struct sshkey_impl sshkey_slh_dsa_impl;
-#endif /* WITH_OPEN_QUANTUM_SAFE */
 
 const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_ed25519_impl,
@@ -150,9 +148,7 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha512_cert_impl,
 	&sshkey_ml_dsa_impl,
 #endif /* WITH_OPENSSL */
-#ifdef WITH_OPEN_QUANTUM_SAFE
 	&sshkey_slh_dsa_impl,
-#endif /* WITH_OPEN_QUANTUM_SAFE */
 	NULL
 };
 
@@ -819,25 +815,32 @@ sshkey_sk_fields_equal(const struct sshkey *a, const struct sshkey *b)
 int
 sshkey_equal_public(const struct sshkey *a, const struct sshkey *b)
 {
+	debug3_f("called");
 	const struct sshkey_impl *impl;
 
 	if (a == NULL || b == NULL ||
 	    sshkey_type_plain(a->type) != sshkey_type_plain(b->type))
 		return 0;
+	debug3_f("types match and input is not null");
 	if ((impl = sshkey_impl_from_type(a->type)) == NULL)
 		return 0;
-	return impl->funcs->equal(a, b);
+	debug3_f("found implementation of key");
+	int res = impl->funcs->equal(a, b);
+	debug3_f("result of equals: %d", res);
+	return res;
 }
 
 int
 sshkey_equal(const struct sshkey *a, const struct sshkey *b)
 {
+	debug3_f("test??");
 	if (a == NULL || b == NULL || a->type != b->type)
 		return 0;
 	if (sshkey_is_cert(a)) {
 		if (!cert_compare(a->cert, b->cert))
 			return 0;
 	}
+	debug3_f("calling sshkey_equal_public next");
 	return sshkey_equal_public(a, b);
 }
 
@@ -1490,6 +1493,7 @@ sshkey_ecdsa_pkey_to_nid(EVP_PKEY *pkey)
 int
 sshkey_generate(int type, u_int bits, struct sshkey **keyp)
 {
+	debug3_f("%d", type);
 	struct sshkey *k;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	const struct sshkey_impl *impl;
@@ -2622,6 +2626,7 @@ sshkey_private_deserialize_sk(struct sshbuf *buf, struct sshkey *k)
 int
 sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 {
+	debug3_f("General deserialization of private");
 	const struct sshkey_impl *impl;
 	char *tname = NULL;
 	char *expect_sk_application = NULL;
@@ -2666,13 +2671,15 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 			goto out;
 		}
 	}
+	debug3_f("checking for implementation");
 	if ((impl = sshkey_impl_from_type(type)) == NULL) {
 		r = SSH_ERR_INTERNAL_ERROR;
 		goto out;
 	}
+	debug3_f("found implementation");
 	if ((r = impl->funcs->deserialize_private(tname, buf, k)) != 0)
 		goto out;
-
+	debug3_f("deserialization of private has finished");
 	if ((expect_sk_application != NULL && (k->sk_application == NULL ||
 	    strcmp(expect_sk_application, k->sk_application) != 0)) ||
 	    (expect_ed25519_pk != NULL && (k->ed25519_pk == NULL ||
@@ -2681,6 +2688,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 		goto out;
 	}
 	/* success */
+	debug3_f("success");
 	r = 0;
 	if (kp != NULL) {
 		*kp = k;
@@ -3192,6 +3200,7 @@ static int
 sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
+	debug3_f("Checking next step");
 	char *comment = NULL;
 	int r = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *decoded = NULL, *decrypted = NULL;
@@ -3219,18 +3228,23 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	    (r = sshbuf_get_cstring(decrypted, &comment, NULL)) != 0) {
 			goto out;
 	}
+	debug3_f("checking padding");
 
 	/* Check deterministic padding after private section */
 	if ((r = private2_check_padding(decrypted)) != 0)
 		goto out;
 
+	debug3_f("checking if private key matches public key");
 	/* Check that the public key in the envelope matches the private key */
 	if (!sshkey_equal(pubkey, k)) {
+		debug3_f("TEST");
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
+	debug3_f("test?");
 
 	/* success */
+	debug3_f("success");
 	r = 0;
 	if (keyp != NULL) {
 		*keyp = k;
@@ -3401,6 +3415,7 @@ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
 	case KEY_ED25519_SK:
+	case KEY_SLH_DSA:
 #ifdef WITH_OPENSSL
 	case KEY_ECDSA_SK:
 #endif /* WITH_OPENSSL */

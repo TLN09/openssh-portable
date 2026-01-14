@@ -186,7 +186,7 @@ int serialize_deserialize_priv_eq(int bits) {
         goto out;
     }
 
-    r = secret_key_cmp(key, deserialized) != 1;
+    r = secret_key_cmp(key, deserialized) != 1 && ssh_slh_dsa_equal(key, deserialized) != 1;
 
   out:
     sshbuf_free(serialization_buffer);

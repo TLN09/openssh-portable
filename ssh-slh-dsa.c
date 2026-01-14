@@ -75,7 +75,7 @@ ssh_slh_dsa_equal(
         fprintf(stderr, "pub key lengths not the same\n");
         return 0;
     }
-
+    debug3_f("calling memcmp");
     return memcmp(a->slh_dsa_pk, b->slh_dsa_pk, a->oqs_sig->length_public_key) == 0;
 }
 
@@ -185,6 +185,13 @@ ssh_slh_dsa_serialize_private(
         return r;
     }
     
+    // hack to allow for private keys to also know the public key.
+    // Used to check it is the correct key when loading them during authentication
+    if ((r = sshbuf_put_string(buffer, key->slh_dsa_pk, key->oqs_sig->length_public_key)) != 0) {
+        fprintf(stderr, "failed putting public key data into sshbuf\n");
+        return r;
+    }
+    
     // Success
     return 0;
 }
@@ -198,6 +205,7 @@ ssh_slh_dsa_deserialize_private(
     u_int32_t length;
     size_t length_method_name;
     size_t length_secret_key;
+    size_t length_public_key;
     char *method_name;
     const u_char *buf_ptr;
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -239,7 +247,28 @@ ssh_slh_dsa_deserialize_private(
     buf_ptr = sshbuf_ptr(buffer);
     memcpy(key->slh_dsa_sk, buf_ptr, length_secret_key);
     sshbuf_consume(buffer, length_secret_key); // Tell the buffer you have read its contents
+    
+    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
+        fprintf(stderr, "failed getting public key length\n");
+        goto out;
+    }
 
+    length_public_key = (size_t)length;
+    if (length_public_key != key->oqs_sig->length_public_key) {
+        fprintf(stderr, "private_deserialize: public key length mismatch: %d != %d\n", length_public_key, key->oqs_sig->length_public_key);
+        r = SSH_ERR_INVALID_FORMAT;
+        goto out;
+    }
+
+    if ((key->slh_dsa_pk = OQS_MEM_malloc(length_public_key)) == NULL) {
+        fprintf(stderr, "failed allocating key->slh_dsa_pk during private deserialization\n");
+        r = SSH_ERR_ALLOC_FAIL;
+        goto out;
+    }
+    buf_ptr = sshbuf_ptr(buffer);
+    memcpy(key->slh_dsa_pk, buf_ptr, length_public_key);
+    sshbuf_consume(buffer, length_public_key); // Tell the buffer you have read its contents
+    
 
     // Success
     r = 0;
