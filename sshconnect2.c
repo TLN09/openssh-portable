@@ -1503,6 +1503,7 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 	}
 	/* register callback for USERAUTH_PK_OK message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PK_OK, &input_userauth_pk_ok);
+	// Register callback for a different number which indicates KEM Auth flow
 
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||

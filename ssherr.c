@@ -145,6 +145,14 @@ ssh_err(int n)
 		return "requested feature not supported";
 	case SSH_ERR_DEVICE_NOT_FOUND:
 		return "device not found";
+	case SSH_ERR_KEM_AUTH_CT_NOT_GENERATED:
+		return "could not generate CT for kem authentication";
+	case SSH_ERR_KEM_AUTH_SS_NOT_GENERATED:
+		return "could not generate SS for kem authentication";
+	case SSH_ERR_KEM_AUTH_SS_MISMATCH:
+		return "shared secret mismatch when decapsulating";
+	case SSH_ERR_KEM_AUTH_DECAPS_FAILED:
+		return "failed decapsulating shared secret";
 	default:
 		return "unknown error";
 	}
