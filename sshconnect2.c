@@ -74,6 +74,7 @@
 #include "utf8.h"
 #include "ssh-sk.h"
 #include "sk-api.h"
+#include "ssh-ml-kem-auth.h"
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -694,8 +695,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("input_userauth_pk_ok: no authentication context");
 
 	if ((r = sshpkt_get_cstring(ssh, &pkalg, NULL)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
+	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0)
 		goto done;
 
 	if ((pktype = sshkey_type_from_name(pkalg)) == KEY_UNSPEC) {
@@ -736,7 +736,20 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	ident = format_identity(id);
 	debug("Server accepts key: %s", ident);
-	sent = sign_and_send_pubkey(ssh, id);
+	switch (pktype) {
+		case KEY_ML_KEM_AUTH:
+			// KEM AUTH CALL
+			// Packet still contains the challenge string
+			sent = kem_auth_send_decaps(ssh, id);
+			break;
+		default:
+			if ((r = sshpkt_get_end(ssh)) != 0) {
+				// Packet should not include more data at this point
+				goto out;
+			}
+			sent = sign_and_send_pubkey(ssh, id);
+			break;
+	}
 	r = 0;
  done:
 	sshkey_free(key);
@@ -749,6 +762,79 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	if (r == 0 && sent == 0)
 		userauth(ssh, NULL);
 	return r;
+}
+
+static int
+kem_auth_send_decaps(struct ssh *ssh, Identity *id) {
+	Authctxt *authctxt = (Authctxt *)ssh->authctxt;
+	u_char *decaps_data = malloc(ML_KEM_AUTH_SS_LENGTH);
+	u_char *encaps_data = NULL;
+	size_t encaps_data_len;
+	sshbuf *b = NULL;
+	char *fp = NULL;
+	const char *method = "publickey";
+	int hostbound = 0;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	int sent = 0;
+
+	/* prefer host-bound pubkey signatures if supported by server */
+	if ((ssh->kex->flags & KEX_HAS_PUBKEY_HOSTBOUND) != 0 &&
+	    (options.pubkey_authentication & SSH_PUBKEY_AUTH_HBOUND) != 0) {
+		hostbound = 1;
+		method = "publickey-hostbound-v00@openssh.com";
+	}
+
+	if ((fp = sshkey_fingerprint(id->key, options.fingerprint_hash,
+	    SSH_FP_DEFAULT)) == NULL) {
+		goto out;
+	}
+
+	debug3_f("using %s with %s %s", method, sshkey_type(id->key), fp);
+	
+	// Get challenge data from the packet
+	if ((r = sshpkt_get_string(ssh, &encaps_data, &encaps_data_len)) != 0 ||
+		(r = sshpkt_get_end(ssh)) != 0) {
+		goto out;
+	}
+	
+	if (encaps_data_len <= 0) {
+		goto out;
+	}
+	
+	// Decapsulate challenge data
+	// verify -> decapsulate
+	if ((r = sshkey_verify(
+			id->key,
+			encaps_data,
+			encaps_data_len,
+			decaps_data,
+			ML_KEM_AUTH_SS_LENGTH,
+			NULL, 0, NULL)) != 0) {
+		goto out;
+	}
+
+	// Send shared secret data to server
+	b = sshbuf_new();
+	sshbuf_put_string(b, decaps_data, decaps_data_len);
+	double t = monotime_double();
+	dprintf(STDERR_FILENO, "auth start: %lf\n", t);
+
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshpkt_putb(ssh, b)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal_fr(r, "enqueue request");
+
+	// Success
+	sent = 1;
+
+  out:
+	if (encaps_data != NULL) {
+		free(encaps_data);
+	}
+	freezero(decaps_data, ML_KEM_AUTH_SS_LENGTH);
+	free(fp);
+	sshbuf_free(b);
+	return sent;
 }
 
 #ifdef GSSAPI

@@ -233,7 +233,7 @@ webauthn_check_prepare_hash(const u_char *data, size_t datalen,
 static int
 ssh_ecdsa_sk_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
-    const u_char *data, size_t dlen, const char *alg, u_int compat,
+    u_char *data, size_t dlen, const char *alg, u_int compat,
     struct sshkey_sig_details **detailsp)
 {
 	ECDSA_SIG *esig = NULL;

@@ -227,7 +227,7 @@ ssh_ed25519_encode_store_sig(const u_char *sig, size_t slen,
 static int
 ssh_ed25519_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
-    const u_char *data, size_t dlen, const char *alg, u_int compat,
+    u_char *data, size_t dlen, const char *alg, u_int compat,
     struct sshkey_sig_details **detailsp)
 {
 	struct sshbuf *b = NULL;

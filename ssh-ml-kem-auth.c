@@ -526,7 +526,7 @@ static const struct sshkey_impl_funcs sshkey_ml_kem_auth_funcs = {
 	/* .generate = */	ssh_ml_kem_auth_generate,
 	/* .copy_public = */	ssh_ml_kem_auth_copy_public,
 	/* .sign = */		ssh_ml_kem_auth_encapsulate,
-	/* .verify = */		NULL,
+	/* .verify = */		ssh_ml_kem_auth_decapsulate,
 };
 
 const struct sshkey_impl sshkey_ml_kem_auth_impl = {

@@ -175,7 +175,7 @@ struct sshkey_impl_funcs {
 	    const u_char *, size_t, const char *,
 	    const char *, const char *, u_int); /* optional */
 	int (*verify)(const struct sshkey *, const u_char *, size_t,
-	    const u_char *, size_t, const char *, u_int,
+	    u_char *, size_t, const char *, u_int,
 	    struct sshkey_sig_details **);
 };
 
