@@ -480,7 +480,7 @@ ssh_ml_kem_auth_decapsulate(
     }
     
     if ((r = EVP_PKEY_decapsulate_init(decaps_ctx, NULL)) <= 0) {
-        fprintf(stderr, "failed initializing decapsulation context\n");
+        fprintf(stderr, "failed initializing decapsulation context %d\n", r);
         r = r == -2 ? SSH_ERR_SIGN_ALG_UNSUPPORTED : SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
