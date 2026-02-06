@@ -324,7 +324,9 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 			switch (key->type) {
 				case KEY_ML_KEM_AUTH:
 					// Also send challenge string for KEM authentication
-					debug3_f("challenge string sent to client: %s", challenge);
+					for (int i = 0; i < challenge_len; i++) 
+						fprintf(stderr, "%x", challenge[i]);
+					fprintf(stderr, "\n");
 					if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
 						!= 0 ||
 						(r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||

@@ -718,6 +718,9 @@ kem_auth_send_decaps(struct ssh *ssh, Identity *id) {
 	
 	// Decapsulate challenge data
 	// verify -> decapsulate
+	for (int i = 0; i < encaps_data_len; i++)
+		fprintf(stderr, "%x", encaps_data[i]);
+	fprintf(stderr, "\n");
 	if ((r = sshkey_verify(
 			id->key,
 			encaps_data,
