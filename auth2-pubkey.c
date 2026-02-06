@@ -318,7 +318,7 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 			sshkey_sign(key, 
 				&challenge, &challenge_len, 
 				authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH, 
-				NULL, NULL, 0);
+				NULL, NULL, NULL, 0);
 		}
 		if (mm_user_key_allowed(ssh, pw, key, 0, NULL)) {
 			switch (key->type) {
