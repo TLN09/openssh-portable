@@ -105,9 +105,9 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 	struct sshkey_sig_details *sig_details = NULL;
 	u_char *challenge = NULL;
 	size_t challenge_len;
+	debug_f("STARTING");
 
 	hostbound = strcmp(method, "publickey-hostbound-v00@openssh.com") == 0;
-
 	if ((r = sshpkt_get_u8(ssh, &have_sig)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &pkalg, NULL)) != 0 ||
 	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0)
