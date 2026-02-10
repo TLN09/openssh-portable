@@ -211,22 +211,15 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		debug_f("KEY_ML_KEM_AUTH %d", key->type == KEY_ML_KEM_AUTH);
 		switch (key->type) {
 			case KEY_ML_KEM_AUTH:
-				// Get response from client
-				debug_f("Trying to get challenge_response from client");
-				if ((r = sshpkt_get_string(ssh, &challenge, &challenge_len)) != 0) {
-					debug_fr(r, "Failed getting challenge string");
-					break;
-				}
-				char *tmp = malloc(challenge_len * 2 + 1);
-				for (int i = 0; i < challenge_len; i++)
-					sprintf(tmp + (i * 2), "%02x", challenge[i]);
-				tmp[challenge_len * 2] = '\0';
-				debug_f("recieved challenge string: %s", tmp);
-				// Check if it matches the shared secret
+				// check if recieved "signature" matches the shared secret generated for the challenge string
 				u_char *ss = (u_char*)authctxt->methoddata;
 				int shared_secret_matches = 1;
-				for (int i = 0; i < challenge_len; i++) {
-					shared_secret_matches &= challenge[i] == ss[i];
+				if (slen != ML_KEM_AUTH_SS_LENGTH) {
+				    debug_f("SS length does not match");
+					break;
+				}
+				for (int i = 0; i < slen; i++) {
+					shared_secret_matches &= sig[i] == ss[i];
 				}
 				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) && shared_secret_matches) {
 					authenticated = 1;
