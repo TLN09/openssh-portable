@@ -208,12 +208,13 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 			goto done;
 		}
 		authenticated = 0;
+		debug_f("KEY_ML_KEM_AUTH %d", key->type == KEY_ML_KEM_AUTH);
 		switch (key->type) {
 			case KEY_ML_KEM_AUTH:
 				// Get response from client
-				sshpkt_get_string(ssh, &challenge, &challenge_len);
-				if (challenge_len <= 0) {
-					// Does not follow the KEM auth flow
+				debug_f("Trying to get challenge_response from client");
+				if ((r = sshpkt_get_string(ssh, &challenge, &challenge_len)) != 0) {
+					debug_fr(r, "Failed getting challenge string");
 					break;
 				}
 				char *tmp = malloc(challenge_len * 2 + 1);
