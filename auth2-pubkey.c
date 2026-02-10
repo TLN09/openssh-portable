@@ -246,10 +246,11 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 #endif
 				/* test for correct signature */
 				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
-					mm_sshkey_verify(key, sig, slen,
-					sshbuf_ptr(b), sshbuf_len(b),
-					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
-					ssh->compat, &sig_details) == 0) {
+				    sshkey_verify(key, sig, slen, sshbuf_ptr(b), sshbuf_len(b), pkalg, ssh->compat, &sig_details) == 0) {
+					// mm_sshkey_verify(key, sig, slen,
+					// sshbuf_ptr(b), sshbuf_len(b),
+					// (ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
+					// ssh->compat, &sig_details) == 0) {
 					authenticated = 1;
 				}
 				break;
