@@ -2008,8 +2008,8 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		ret = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
-		debug3_fr(r, "sshbuf_get_cstring failed");
+	if ((ret = sshbuf_get_cstring(b, &ktype, NULL)) != 0) {
+		debug3_fr(ret, "sshbuf_get_cstring failed");
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
