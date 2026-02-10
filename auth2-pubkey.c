@@ -112,6 +112,7 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 	    (r = sshpkt_get_cstring(ssh, &pkalg, NULL)) != 0 ||
 	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0)
 		fatal_fr(r, "parse %s packet", method);
+	debug_f("HAVE_SIG: %d", have_sig);
 
 	/* hostbound auth includes the hostkey offered at initial KEX */
 	if (hostbound) {
