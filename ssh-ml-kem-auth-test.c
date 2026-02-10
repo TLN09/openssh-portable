@@ -4,6 +4,7 @@
 #include "sshbuf.h"
 #include "ssherr.h"
 #include "ssh-ml-kem-auth.h"
+#include "authfile.h"
 
 int generate_key_default() {
     struct sshkey *key = sshkey_new(KEY_ML_KEM_AUTH);
@@ -44,17 +45,17 @@ int generate_key_with_bits(int bits) {
             /* code */
             r = !(r == 1);
             break;
-        
+
         case ML_KEM_AUTH_768_BITS:
             /* code */
             r = !(r == 3);
             break;
-        
+
         case ML_KEM_AUTH_1024_BITS:
             /* code */
             r = !(r == 5);
             break;
-        
+
         default:
             r = SSH_ERR_INTERNAL_ERROR;
             fprintf(stderr, "bits parameter is incorrect\n");
@@ -88,14 +89,14 @@ int key_not_equal_another_same_bits(int bits) {
         fprintf(stderr, "Failed generating first key: %d\n", r);
         goto out;
     }
-    
+
     if ((r = ssh_ml_kem_auth_generate(other, bits)) != 0) {
         fprintf(stderr, "Failed generating second key: %d\n", r);
         goto out;
     }
 
     r = ssh_ml_kem_auth_equal(key, other);
-  
+
   out:
     sshkey_free(key);
     sshkey_free(other);
@@ -109,12 +110,12 @@ int key_not_equal_another_different_bits(int key_bits, int other_bits) {
     if ((r = ssh_ml_kem_auth_generate(key, key_bits)) != 0) {
         goto out;
     }
-    
+
     if ((r = ssh_ml_kem_auth_generate(other, other_bits)) != 0) {
         goto out;
     }
     r = ssh_ml_kem_auth_equal(key, other);
-  
+
   out:
     sshkey_free(key);
     sshkey_free(other);
@@ -153,7 +154,7 @@ int serialize_deserialize_pub_eq(int bits) {
     if ((r = ssh_ml_kem_auth_generate(key, bits)) != 0) {
         goto out;
     }
-    
+
     if ((r = ssh_ml_kem_auth_serialize_public(key, serialization_buffer, SSHKEY_SERIALIZE_DEFAULT)) != 0) {
         fprintf(stderr, "serialization failed for public key\n");
         goto out;
@@ -178,7 +179,7 @@ int serialize_deserialize_priv_eq(int bits) {
     struct sshkey *key = sshkey_new(KEY_ML_KEM_AUTH);
     struct sshbuf *serialization_buffer = sshbuf_new();
     struct sshkey *deserialized = sshkey_new(KEY_ML_KEM_AUTH);
-    
+
     if ((r = ssh_ml_kem_auth_generate(key, bits)) != 0) {
         goto out;
     }
@@ -234,6 +235,109 @@ int generate_encapsulation(int bits) {
     return r;
 }
 
+int generate_encapsulation_from_saved_key(char *path) {
+    struct sshkey *key = sshkey_new(KEY_ML_KEM_AUTH);
+    char *comment = NULL;
+    u_char *ct = NULL;
+    size_t ct_len = 0;
+    u_char *ss = malloc(ML_KEM_AUTH_SS_LENGTH);
+    int r = SSH_ERR_INTERNAL_ERROR;
+
+    if ((r = sshkey_load_public(path, &key, &comment)) != 0) {
+        fprintf(stderr, "failed loading public key from file: %s\n", path);
+        goto out;
+    }
+
+    if ((r = ssh_ml_kem_auth_encapsulate(key, &ct, &ct_len, ss, ML_KEM_AUTH_SS_LENGTH, NULL, NULL, NULL, 0)) != 0) {
+        fprintf(stderr, "Failed encapsulating shared secret\n");
+        goto out;
+    }
+
+    if (ct == NULL) {
+        fprintf(stderr, "Ciphertext is not set after encapsulation\n");
+        r = SSH_ERR_KEM_AUTH_CT_NOT_GENERATED;
+        goto out;
+    }
+
+
+  out:
+    sshkey_free(key);
+    if (comment != NULL) {
+        free(comment);
+    }
+    if (ct != NULL) {
+        free(ct);
+    }
+    free(ss);
+    return r;
+}
+
+int encapsulate_decapsulate_ss_eq_saved_key(char *path) {
+    struct sshkey *public_key = sshkey_new(KEY_ML_KEM_AUTH);
+    struct sshkey *private_key = sshkey_new(KEY_ML_KEM_AUTH);
+    char *comment = NULL;
+    u_char *ct = NULL;
+    size_t ct_len = 0;
+    u_char *ss = malloc(ML_KEM_AUTH_SS_LENGTH);
+    u_char *ss_decaps = malloc(ML_KEM_AUTH_SS_LENGTH);
+    int r = SSH_ERR_INTERNAL_ERROR;
+
+    if ((r = sshkey_load_public(path, &public_key, &comment)) != 0) {
+        fprintf(stderr, "failed loading public key from file: %s", path);
+        goto out;
+    }
+
+    if ((r = sshkey_load_private(path, NULL, &private_key, &comment)) != 0) {
+        fprintf(stderr, "failed loading public key from file: %s", path);
+        goto out;
+    }
+
+    if ((r = ssh_ml_kem_auth_encapsulate(public_key, &ct, &ct_len, ss, ML_KEM_AUTH_SS_LENGTH, NULL, NULL, NULL, 0)) != 0) {
+        fprintf(stderr, "Failed encapsulating shared secret\n");
+        goto out;
+    }
+
+    if (ct == NULL) {
+        fprintf(stderr, "Ciphertext is not set after encapsulation\n");
+        r = SSH_ERR_KEM_AUTH_CT_NOT_GENERATED;
+        goto out;
+    }
+
+    if (ss == NULL) {
+        r = SSH_ERR_KEM_AUTH_SS_NOT_GENERATED;
+        fprintf(stderr, "Shared secret is not set after encapsulation\n");
+        goto out;
+    }
+
+    if ((r = ssh_ml_kem_auth_decapsulate(private_key, ct, ct_len, ss_decaps, ML_KEM_AUTH_SS_LENGTH, NULL, 0, NULL)) != 0) {
+        fprintf(stderr, "Failed decapsulating ciphertext\n");
+        goto out;
+    }
+
+    int i = 0;
+    while (i < ML_KEM_AUTH_SS_LENGTH && ss[i] == ss_decaps[i]) {
+        i++;
+    }
+
+    r = i < ML_KEM_AUTH_SS_LENGTH ? SSH_ERR_KEM_AUTH_SS_MISMATCH : 0;
+    if (r != 0) {
+        fprintf(stderr, "Mismatch between shared secret before and after decapsulation\n");
+    }
+
+  out:
+    sshkey_free(public_key);
+    sshkey_free(private_key);
+    if (comment != NULL) {
+        free(comment);
+    }
+    if (ct != NULL) {
+        free(ct);
+    }
+    free(ss);
+    free(ss_decaps);
+    return r;
+}
+
 int encapsulate_decapsulate_ss_eq(int bits) {
     int r = SSH_ERR_INTERNAL_ERROR;
     struct sshkey *key = sshkey_new(KEY_ML_KEM_AUTH);
@@ -269,7 +373,7 @@ int encapsulate_decapsulate_ss_eq(int bits) {
         goto out;
     }
 
-    int i = 0; 
+    int i = 0;
     while (i < ML_KEM_AUTH_SS_LENGTH && ss[i] == ss_decaps[i]) {
         i++;
     }
@@ -285,6 +389,47 @@ int encapsulate_decapsulate_ss_eq(int bits) {
     }
     if (ss != NULL) {
         free(ss);
+    }
+    sshkey_free(key);
+    return r;
+}
+
+int encaps_then_decaps_with_sshkey_verify(int bits) {
+    u_char *ct = NULL;
+    size_t ct_len;
+    u_char *ss = malloc(ML_KEM_AUTH_SS_LENGTH);
+    u_char *ss_decaps = malloc(ML_KEM_AUTH_SS_LENGTH);
+    int r = SSH_ERR_SIGNATURE_INVALID;
+    struct sshkey *key = sshkey_new(KEY_ML_KEM_AUTH);
+
+    if ((r = ssh_ml_kem_auth_generate(key, bits)) != 0) {
+        goto out;
+    }
+
+    if ((r = ssh_ml_kem_auth_encapsulate(key, &ct, &ct_len, ss, ML_KEM_AUTH_SS_LENGTH, NULL, NULL, NULL, 0)) != 0) {
+        fprintf(stderr, "Failed encapsulating shared secret\n");
+        goto out;
+    }
+
+    if ((r = sshkey_verify(key, ct, ct_len, ss_decaps, ML_KEM_AUTH_SS_LENGTH, NULL, 0, NULL)) != 0) {
+		goto out;
+	}
+
+    int i = 0;
+    while (i < ML_KEM_AUTH_SS_LENGTH && ss[i] == ss_decaps[i]) {
+        i++;
+    }
+
+    r = i < ML_KEM_AUTH_SS_LENGTH ? SSH_ERR_KEM_AUTH_SS_MISMATCH : 0;
+    if (r != 0) {
+        fprintf(stderr, "Mismatch between shared secret before and after decapsulation\n");
+    }
+
+  out:
+    free(ss);
+    free(ss_decaps);
+    if (ct != NULL) {
+        free(ct);
     }
     sshkey_free(key);
     return r;
@@ -312,7 +457,7 @@ int run_key_generation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d: ", bits);
     if (generate_key_with_bits(bits)) {
@@ -320,7 +465,7 @@ int run_key_generation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d: ", bits);
     if (generate_key_with_bits(bits)) {
@@ -333,7 +478,7 @@ int run_key_generation_tests() {
 
 int run_key_equality_tests() {
     printf("KEY EQUALITY TESTS\n");
-    
+
     int bits = ML_KEM_AUTH_512_BITS;
     printf("    ML-KEM-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
@@ -341,7 +486,7 @@ int run_key_equality_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
@@ -349,7 +494,7 @@ int run_key_equality_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d equal to itself: ", bits);
     if (key_equal_itself(bits)) {
@@ -364,7 +509,7 @@ int run_key_equality_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d not equal to another of same type: ", bits);
     if (key_not_equal_another_same_bits(bits)) {
@@ -372,7 +517,7 @@ int run_key_equality_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d not equal to another of same type: ", bits);
     if (key_not_equal_another_same_bits(bits)) {
@@ -380,7 +525,7 @@ int run_key_equality_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     printf("    ML-KEM-%d not equal to ML-KEM-%d: ", ML_KEM_AUTH_512_BITS, ML_KEM_AUTH_768_BITS);
     if (key_not_equal_another_different_bits(ML_KEM_AUTH_512_BITS, ML_KEM_AUTH_768_BITS)) {
         printf("[x]\n");
@@ -406,7 +551,7 @@ int run_copy_public_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d equal to itself when pulic is copied: ", bits);
     if (copy_public_equal_to_itself(bits)) {
@@ -414,7 +559,7 @@ int run_copy_public_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d equal to itself when pulic is copied: ", bits);
     if (copy_public_equal_to_itself(bits)) {
@@ -427,7 +572,7 @@ int run_copy_public_tests() {
 
 int run_key_serialization_tests() {
     printf("KEY (DE)SERIALIZATION TESTS\n");
-    
+
     int bits = ML_KEM_AUTH_512_BITS;
     printf("    ML-KEM-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
@@ -435,7 +580,7 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_512_BITS;
     printf("    ML-KEM-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
@@ -443,7 +588,7 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
@@ -451,7 +596,7 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
@@ -459,7 +604,7 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d public (de)serialization: ", bits);
     if (serialize_deserialize_pub_eq(bits)) {
@@ -467,7 +612,7 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d private (de)serialization: ", bits);
     if (serialize_deserialize_priv_eq(bits)) {
@@ -475,13 +620,13 @@ int run_key_serialization_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     return 0;
 }
 
 int run_encapsulation_tests() {
     printf("KEY ENCAPSULATION TESTS\n");
-    
+
     int bits = ML_KEM_AUTH_512_BITS;
     printf("    ML-KEM-%d encapsulation: ", bits);
     if (generate_encapsulation(bits)) {
@@ -489,7 +634,7 @@ int run_encapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d encapsulation: ", bits);
     if (generate_encapsulation(bits)) {
@@ -497,7 +642,7 @@ int run_encapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d encapsulation: ", bits);
     if (generate_encapsulation(bits)) {
@@ -505,13 +650,21 @@ int run_encapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
+    printf("    ML-KEM SAVED KEY encapsulation: ", bits);
+    char *path = "/Users/tln/.ssh/id_ml_kem_auth";
+    if (generate_encapsulation_from_saved_key(path)) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
+
     return 0;
 }
 
 int run_decapsulation_tests() {
     printf("KEY DECAPSULATION TESTS\n");
-    
+
     int bits = ML_KEM_AUTH_512_BITS;
     printf("    ML-KEM-%d decapsulation: ", bits);
     if (encapsulate_decapsulate_ss_eq(bits)) {
@@ -519,7 +672,7 @@ int run_decapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_768_BITS;
     printf("    ML-KEM-%d decapsulation: ", bits);
     if (encapsulate_decapsulate_ss_eq(bits)) {
@@ -527,7 +680,7 @@ int run_decapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
     bits = ML_KEM_AUTH_1024_BITS;
     printf("    ML-KEM-%d decapsulation: ", bits);
     if (encapsulate_decapsulate_ss_eq(bits)) {
@@ -535,7 +688,39 @@ int run_decapsulation_tests() {
         return 1;
     }
     printf("[v]\n");
-    
+
+    bits = ML_KEM_AUTH_512_BITS;
+    printf("    ML-KEM-%d decapsulation with sshkey_verify: ", bits);
+    if (encaps_then_decaps_with_sshkey_verify(bits)) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
+
+    bits = ML_KEM_AUTH_768_BITS;
+    printf("    ML-KEM-%d decapsulation with sshkey_verify: ", bits);
+    if (encaps_then_decaps_with_sshkey_verify(bits)) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
+
+    bits = ML_KEM_AUTH_1024_BITS;
+    printf("    ML-KEM-%d decapsulation with sshkey_verify: ", bits);
+    if (encaps_then_decaps_with_sshkey_verify(bits)) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
+
+    printf("    ML-KEM SAVED KEY decapsulation: ");
+    char *path = "/Users/tln/.ssh/id_ml_kem_auth";
+    if (encapsulate_decapsulate_ss_eq_saved_key(path)) {
+        printf("[x]\n");
+        return 1;
+    }
+    printf("[v]\n");
+
     return 0;
 }
 
@@ -545,27 +730,27 @@ int run_tests() {
     if (run_key_generation_tests()) {
         return 1;
     }
-    
+
     printf("===================================\n");
     if (run_key_equality_tests()) {
         return 1;
     }
-    
+
     printf("===================================\n");
     if (run_copy_public_tests()) {
         return 1;
     }
-    
+
     printf("===================================\n");
     if (run_key_serialization_tests()) {
         return 1;
     }
-    
+
     printf("===================================\n");
     if (run_encapsulation_tests()) {
         return 1;
     }
-    
+
     printf("===================================\n");
     if (run_decapsulation_tests()) {
         return 1;

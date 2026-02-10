@@ -211,10 +211,15 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 			case KEY_ML_KEM_AUTH:
 				// Get response from client
 				sshpkt_get_string(ssh, &challenge, &challenge_len);
-				if (challenge_len <= 0) { 
+				if (challenge_len <= 0) {
 					// Does not follow the KEM auth flow
 					break;
 				}
+				char *tmp = malloc(challenge_len * 2 + 1);
+				for (int i = 0; i < challenge_len; i++)
+					sprintf(tmp + (i * 2), "%02x", challenge[i]);
+				tmp[challenge_len * 2] = '\0';
+				debug_f("recieved challenge string: %s", tmp);
 				// Check if it matches the shared secret
 				u_char *ss = (u_char*)authctxt->methoddata;
 				int shared_secret_matches = 1;
@@ -315,9 +320,9 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		if (key->type == KEY_ML_KEM_AUTH) {
 			// Create the KEM challenge string and save shared secret generated
 			authctxt->methoddata = malloc(ML_KEM_AUTH_SS_LENGTH);
-			sshkey_sign(key, 
-				&challenge, &challenge_len, 
-				authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH, 
+			sshkey_sign(key,
+				&challenge, &challenge_len,
+				authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH,
 				NULL, NULL, NULL, 0);
 		}
 		if (mm_user_key_allowed(ssh, pw, key, 0, NULL)) {
@@ -325,12 +330,12 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 				case KEY_ML_KEM_AUTH:
 					// Also send challenge string for KEM authentication
 					char *tmp = malloc(challenge_len * 2 + 1);
-					for (int i = 0; i < challenge_len; i++) 
+					for (int i = 0; i < challenge_len; i++)
 						sprintf(tmp + (i * 2), "%02x", challenge[i]);
 					tmp[challenge_len * 2] = '\0';
 					debug_f("challenge string: %s", tmp);
 					free(tmp);
-					
+
 					if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
 						!= 0 ||
 						(r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
