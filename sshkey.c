@@ -2009,7 +2009,7 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		goto out;
 	}
 	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
-		debug3_f("sshbuf_get_cstring failed");
+		debug3_fr(r, "sshbuf_get_cstring failed");
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
