@@ -1574,10 +1574,12 @@ mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
 	switch (key->type) {
     case KEY_ML_KEM_AUTH:
 		ret = 1;
-		if (signaturelen != ML_KEM_AUTH_SS_LENGTH || datalen != ML_KEM_AUTH_SS_LENGTH) {
-		    debug_f("signature length: %d, datalen: %d", signaturelen, datalen);
+		if (signaturelen != ML_KEM_AUTH_SS_LENGTH) {
+		    debug_f("signature length: %d, datalen: %d", signaturelen);
 		    ret = 0;
 		}
+		// Skip over all other data than the shared secret value in the final 32 bytes.
+		data += datalen - ML_KEM_AUTH_SS_LENGTH;
 		for (int i = 0; ret && i < ML_KEM_AUTH_SS_LENGTH; i++) {
 			ret &= signature[i] == data[i];
 		}
