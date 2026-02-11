@@ -1567,6 +1567,7 @@ mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
     case KEY_ML_KEM_AUTH:
 		ret = 1;
 		if (signaturelen != ML_KEM_AUTH_SS_LENGTH || datalen != ML_KEM_AUTH_SS_LENGTH) {
+		    debug_f("signature length: %d, datalen: %d", signaturelen, datalen);
 		    ret = 0;
 		}
 		for (int i = 0; ret && i < ML_KEM_AUTH_SS_LENGTH; i++) {

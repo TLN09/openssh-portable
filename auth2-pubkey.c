@@ -212,10 +212,12 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		switch (key->type) {
 			case KEY_ML_KEM_AUTH:
 				// check if recieved "signature" matches the shared secret generated for the challenge string
-
+				if ((r = sshbuf_put_string(b, authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH)) != 0) {
+				    fatal_fr(r, "failed putting shared secret into data buffer");
+				}
 				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
     			        mm_sshkey_verify(key, sig, slen,
-    					authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH,
+    					sshbuf_ptr(b), sshbuf_len(b),
     					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
     					ssh->compat, &sig_details) == 0) {
 					authenticated = 1;
