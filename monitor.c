@@ -1424,6 +1424,9 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 	    (r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
 	    (hostbound && (r = sshkey_froms(b, &hostkey)) != 0))
 		fatal_fr(r, "parse pk");
+	if (type == KEY_ML_KEM_AUTH) {
+	    sshbuf_skip_string(b); /* shared secret data from authctxt */
+	}
 	if (sshbuf_len(b) != 0)
 		fail++;
 	sshbuf_free(b);
