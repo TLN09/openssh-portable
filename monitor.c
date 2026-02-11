@@ -1366,7 +1366,8 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 	struct sshkey *hostkey = NULL;
 	const u_char *p;
 	char *userstyle, *cp;
-	size_t len;
+	u_char *pkalg;
+	size_t len, pkalg_len;
 	u_char type;
 	int hostbound = 0, r, fail = 0;
 
@@ -1420,12 +1421,16 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 		fatal_fr(r, "parse pktype");
 	if (type == 0)
 		fail++;
-	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkalg */
-	    (r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
+	if ((r = sshbuf_get_string(b, &pkalg, &pkalg_len)) != 0) {
+	    fatal_fr(r, "parse pkalg failed");
+	}
+	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
 	    (hostbound && (r = sshkey_froms(b, &hostkey)) != 0))
 		fatal_fr(r, "parse pk");
-	if (type == KEY_ML_KEM_AUTH) {
-	    sshbuf_skip_string(b); /* shared secret data from authctxt */
+	if (sshkey_type_from_name(pkalg) == KEY_ML_KEM_AUTH) {
+	    if ((r = sshbuf_skip_string(b)) != 0) /* shared secret data from authctxt */ {
+			fail++;
+		}
 	}
 	if (sshbuf_len(b) != 0)
 		fail++;
