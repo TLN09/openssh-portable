@@ -212,16 +212,12 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		switch (key->type) {
 			case KEY_ML_KEM_AUTH:
 				// check if recieved "signature" matches the shared secret generated for the challenge string
-				u_char *ss = (u_char*)authctxt->methoddata;
-				int shared_secret_matches = 1;
-				if (slen != ML_KEM_AUTH_SS_LENGTH) {
-				    debug_f("SS length does not match");
-					break;
-				}
-				for (int i = 0; i < slen; i++) {
-					shared_secret_matches &= sig[i] == ss[i];
-				}
-				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) && shared_secret_matches) {
+
+				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
+    			        mm_sshkey_verify(key, sig, slen,
+    					authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH,
+    					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
+    					ssh->compat, &sig_details) == 0) {
 					authenticated = 1;
 				}
 				break;
@@ -246,11 +242,10 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 #endif
 				/* test for correct signature */
 				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
-				    sshkey_verify(key, sig, slen, sshbuf_ptr(b), sshbuf_len(b), pkalg, ssh->compat, &sig_details) == 0) {
-					// mm_sshkey_verify(key, sig, slen,
-					// sshbuf_ptr(b), sshbuf_len(b),
-					// (ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
-					// ssh->compat, &sig_details) == 0) {
+					mm_sshkey_verify(key, sig, slen,
+					sshbuf_ptr(b), sshbuf_len(b),
+					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
+					ssh->compat, &sig_details) == 0) {
 					authenticated = 1;
 				}
 				break;
