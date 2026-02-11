@@ -209,6 +209,20 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		}
 		authenticated = 0;
 		debug_f("KEY_ML_KEM_AUTH %d", key->type == KEY_ML_KEM_AUTH);
+		xasprintf(&userstyle, "%s%s%s", authctxt->user,
+			authctxt->style ? ":" : "",
+			authctxt->style ? authctxt->style : "");
+		if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+			(r = sshbuf_put_cstring(b, userstyle)) != 0 ||
+			(r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
+			(r = sshbuf_put_cstring(b, method)) != 0 ||
+			(r = sshbuf_put_u8(b, have_sig)) != 0 ||
+			(r = sshbuf_put_cstring(b, pkalg)) != 0 ||
+			(r = sshbuf_put_string(b, pkblob, blen)) != 0)
+			fatal_fr(r, "reconstruct %s packet", method);
+		if (hostbound &&
+			(r = sshkey_puts(ssh->kex->initial_hostkey, b)) != 0)
+			fatal_fr(r, "reconstruct %s packet", method);
 		switch (key->type) {
 			case KEY_ML_KEM_AUTH:
 				// check if recieved "signature" matches the shared secret generated for the challenge string
@@ -224,21 +238,6 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 				}
 				break;
 			default:
-				/* reconstruct packet */
-				xasprintf(&userstyle, "%s%s%s", authctxt->user,
-					authctxt->style ? ":" : "",
-					authctxt->style ? authctxt->style : "");
-				if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
-					(r = sshbuf_put_cstring(b, userstyle)) != 0 ||
-					(r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
-					(r = sshbuf_put_cstring(b, method)) != 0 ||
-					(r = sshbuf_put_u8(b, have_sig)) != 0 ||
-					(r = sshbuf_put_cstring(b, pkalg)) != 0 ||
-					(r = sshbuf_put_string(b, pkblob, blen)) != 0)
-					fatal_fr(r, "reconstruct %s packet", method);
-				if (hostbound &&
-					(r = sshkey_puts(ssh->kex->initial_hostkey, b)) != 0)
-					fatal_fr(r, "reconstruct %s packet", method);
 #ifdef DEBUG_PK
 				sshbuf_dump(b, stderr);
 #endif
