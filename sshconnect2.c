@@ -376,6 +376,7 @@ void	userauth(struct ssh *, char *);
 
 static void pubkey_cleanup(struct ssh *);
 static int sign_and_send_pubkey(struct ssh *ssh, Identity *);
+static int kem_auth_send_decaps(struct ssh *ssh, Identity *);
 static void pubkey_prepare(struct ssh *, Authctxt *);
 static void pubkey_reset(Authctxt *);
 static struct sshkey *load_identity_file(Identity *);
@@ -677,84 +678,6 @@ format_identity(Identity *id)
 	    id->agent_fd != -1 ? " agent" : "");
 	free(fp);
 	return ret;
-}
-
-static int
-kem_auth_send_decaps(struct ssh *ssh, Identity *id) {
-	Authctxt *authctxt = (Authctxt *)ssh->authctxt;
-	u_char *decaps_data = malloc(ML_KEM_AUTH_SS_LENGTH);
-	u_char *encaps_data = NULL;
-	size_t encaps_data_len;
-	struct sshbuf *b = NULL;
-	char *fp = NULL;
-	const char *method = "publickey";
-	int hostbound = 0;
-	int r = SSH_ERR_INTERNAL_ERROR;
-	int sent = 0;
-
-	/* prefer host-bound pubkey signatures if supported by server */
-	if ((ssh->kex->flags & KEX_HAS_PUBKEY_HOSTBOUND) != 0 &&
-	    (options.pubkey_authentication & SSH_PUBKEY_AUTH_HBOUND) != 0) {
-		hostbound = 1;
-		method = "publickey-hostbound-v00@openssh.com";
-	}
-
-	if ((fp = sshkey_fingerprint(id->key, options.fingerprint_hash,
-	    SSH_FP_DEFAULT)) == NULL) {
-		goto out;
-	}
-
-	debug3_f("using %s with %s %s", method, sshkey_type(id->key), fp);
-
-	// Get challenge data from the packet
-	if ((r = sshpkt_get_string(ssh, &encaps_data, &encaps_data_len)) != 0 ||
-		(r = sshpkt_get_end(ssh)) != 0) {
-		goto out;
-	}
-
-	if (encaps_data_len <= 0) {
-		goto out;
-	}
-
-	// Decapsulate challenge data
-	// verify -> decapsulate
-	for (int i = 0; i < encaps_data_len; i++)
-		fprintf(stderr, "%02x", encaps_data[i]);
-	fprintf(stderr, "\n");
-	// if ((r = sshkey_verify(
-	// 		id->key,
-	// 		encaps_data,
-	// 		encaps_data_len,
-	// 		decaps_data,
-	// 		ML_KEM_AUTH_SS_LENGTH,
-	// 		NULL, 0, NULL)) != 0) {
-	// 	goto out;
-	// }
-	for (int i = 0; i < ML_KEM_AUTH_SS_LENGTH; i++)
-	    decaps_data[i] = i;
-
-	// Send shared secret data to server
-	b = sshbuf_new();
-	sshbuf_put_string(b, decaps_data, ML_KEM_AUTH_SS_LENGTH);
-	double t = monotime_double();
-	dprintf(STDERR_FILENO, "auth start: %lf\n", t);
-
-	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
-	    (r = sshpkt_putb(ssh, b)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		fatal_fr(r, "enqueue request");
-
-	// Success
-	sent = 1;
-
-  out:
-	if (encaps_data != NULL) {
-		free(encaps_data);
-	}
-	freezero(decaps_data, ML_KEM_AUTH_SS_LENGTH);
-	free(fp);
-	sshbuf_free(b);
-	return sent;
 }
 
 static int
@@ -1569,6 +1492,130 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	free(alg);
 	sshbuf_free(b);
 	freezero(signature, slen);
+	return sent;
+}
+
+static int
+kem_auth_send_decaps(struct ssh *ssh, Identity *id) {
+	Authctxt *authctxt = (Authctxt *)ssh->authctxt;
+	u_char *decaps_data = malloc(ML_KEM_AUTH_SS_LENGTH);
+	u_char *encaps_data = NULL;
+	size_t encaps_data_len;
+	struct sshbuf *b = NULL;
+	char *fp = NULL;
+	const char *method = "publickey";
+	char *alg = NULL;
+	int hostbound = 0;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	int sent = 0;
+	struct sshkey *decaps_key = NULL;
+	struct sshkey *prv = NULL;
+
+	/* prefer host-bound pubkey signatures if supported by server */
+	if ((ssh->kex->flags & KEX_HAS_PUBKEY_HOSTBOUND) != 0 &&
+	    (options.pubkey_authentication & SSH_PUBKEY_AUTH_HBOUND) != 0) {
+		hostbound = 1;
+		method = "publickey-hostbound-v00@openssh.com";
+	}
+
+	if ((fp = sshkey_fingerprint(id->key, options.fingerprint_hash,
+	    SSH_FP_DEFAULT)) == NULL) {
+		goto out;
+	}
+
+	debug3_f("using %s with %s %s", method, sshkey_type(id->key), fp);
+
+	if ((alg = key_sig_algorithm(NULL, id->key)) == NULL) {
+		error_f("no mutual signature supported");
+		goto out;
+	}
+
+	debug3_f("decapsulating using %s %s", alg, fp);
+
+	// Get challenge data from the packet
+	if ((r = sshpkt_get_string(ssh, &encaps_data, &encaps_data_len)) != 0 ||
+		(r = sshpkt_get_end(ssh)) != 0) {
+		goto out;
+	}
+
+	if (encaps_data_len <= 0) {
+		goto out;
+	}
+
+	// Decapsulate challenge data
+	// verify -> decapsulate
+	for (int i = 0; i < encaps_data_len; i++)
+		fprintf(stderr, "%02x", encaps_data[i]);
+	fprintf(stderr, "\n");
+
+	// Send shared secret data to server
+	if ((b = sshbuf_new()) == NULL) {
+	    fatal_f("sshbuf_new failed");
+	}
+	if ((r = sshbuf_put_cstring(b, authctxt->server_user)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
+	    (r = sshbuf_put_cstring(b, method)) != 0 ||
+		(r = sshbuf_put_u8(b, 1)) != 0 ||
+	    (r = sshbuf_put_cstring(b, alg)) != 0 ||
+	    (r = sshkey_puts(id->key, b)) != 0) {
+		fatal_fr(r, "assemble signed data");
+	}
+
+	if (hostbound) {
+		if (ssh->kex->initial_hostkey == NULL) {
+			fatal_f("internal error: initial hostkey "
+			    "not recorded");
+		}
+		if ((r = sshkey_puts(ssh->kex->initial_hostkey, b)) != 0)
+			fatal_fr(r, "assemble %s hostkey", method);
+	}
+
+	if (id->isprivate) {
+	    decaps_key = id->key;
+	} else {
+        /* Load the private key from the file. */
+    	if ((prv = load_identity_file(id)) == NULL)
+    		return SSH_ERR_KEY_NOT_FOUND;
+    	if (id->key != NULL && !sshkey_equal_public(prv, id->key)) {
+    		error_f("private key %s contents do not match public",
+    		    id->filename);
+    		r = SSH_ERR_KEY_NOT_FOUND;
+    		goto out;
+    	}
+    	decaps_key = prv;
+	}
+	if ((r = sshkey_verify(
+	        decaps_key,
+			encaps_data,
+			encaps_data_len,
+			decaps_data,
+			ML_KEM_AUTH_SS_LENGTH,
+			NULL, 0, NULL)) != 0) {
+		goto out;
+	}
+
+	if ((r = sshbuf_put_string(b, decaps_data, ML_KEM_AUTH_SS_LENGTH)) != 0) {
+	    fatal_fr(r, "append decaps_data");
+	}
+	double t = monotime_double();
+	dprintf(STDERR_FILENO, "auth start: %lf\n", t);
+
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshpkt_putb(ssh, b)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal_fr(r, "enqueue request");
+
+	// Success
+	sent = 1;
+
+  out:
+	if (encaps_data != NULL) {
+		free(encaps_data);
+	}
+	freezero(decaps_data, ML_KEM_AUTH_SS_LENGTH);
+	free(fp);
+	free(alg);
+	sshbuf_free(b);
 	return sent;
 }
 
