@@ -75,7 +75,7 @@ MKDIR_P=@MKDIR_P@
 
 .SUFFIXES: .lo
 
-TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(SK_STANDALONE) ssh-ml-dsa-test ssh-slh-dsa-test
+TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) sshd-session$(EXEEXT) sshd-auth$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT) ssh-sk-helper$(EXEEXT) $(SK_STANDALONE) ssh-ml-dsa-test ssh-slh-dsa-test ssh-ml-kem-auth-test
 
 LIBOPENSSH_OBJS=\
 	ssh_api.o \
@@ -97,7 +97,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	readpass.o ttymodes.o xmalloc.o addr.o addrmatch.o \
 	atomicio.o dispatch.o mac.o misc.o utf8.o \
 	monitor_fdpass.o rijndael.o ssh-ecdsa.o ssh-ecdsa-sk.o \
-	ssh-ed25519-sk.o ssh-rsa.o ssh-ml-dsa.o ssh-slh-dsa.o dh.o \
+	ssh-ed25519-sk.o ssh-rsa.o ssh-ml-dsa.o ssh-slh-dsa.o ssh-ml-kem-auth.o dh.o \
 	msg.o dns.o entropy.o gss-genr.o umac.o umac128.o \
 	smult_curve25519_ref.o \
 	poly1305.o chacha.o cipher-chachapoly.o cipher-chachapoly-libcrypto.o \
@@ -175,6 +175,10 @@ SFTP_OBJS=	sftp.o sftp-usergroup.o progressmeter.o $(SFTP_CLIENT_OBJS)
 SSH_ML_DSA_TEST_OBJ= ssh-ml-dsa-test.o ssh-ml-dsa.o ssh-pkcs11.o $(SKOBJS)
 
 SSH_ML_DSA_BENCH_OBJ= ssh-ml-dsa-bench.o ssh-ml-dsa.o ssh-pkcs11.o $(SKOBJS)
+
+SSH_ML_KEM_AUTH_TEST_OBJ= ssh-ml-kem-auth-test.o ssh-ml-kem-auth.o ssh-pkcs11.o $(SKOBJS)
+
+SSH_ML_KEM_AUTH_BENCH_OBJ= ssh-ml-kem-auth-bench.o ssh-ml-kem-auth.o ssh-pkcs11.o $(SKOBJS)
 
 SSH_SLH_DSA_TEST_OBJ= ssh-slh-dsa-test.o ssh-slh-dsa.o ssh-pkcs11.o $(SKOBJS)
 
@@ -274,6 +278,12 @@ ssh-ml-dsa-test: $(LIBCOMPAT) libssh.a $(SSH_ML_DSA_TEST_OBJ)
 
 ssh-ml-dsa-bench: $(LIBCOMPAT) libssh.a $(SSH_ML_DSA_BENCH_OBJ)
 	$(LD) -o $@ $(SSH_ML_DSA_BENCH_OBJ) $(LDFLAGS) -lm -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
+
+ssh-ml-kem-auth-test: $(LIBCOMPAT) libssh.a $(SSH_ML_KEM_AUTH_TEST_OBJ) 
+	$(LD) -o $@ $(SSH_ML_KEM_AUTH_TEST_OBJ) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
+
+ssh-ml-kem-auth-bench: $(LIBCOMPAT) libssh.a $(SSH_ML_KEM_AUTH_BENCH_OBJ) 
+	$(LD) -o $@ $(SSH_ML_KEM_AUTH_BENCH_OBJ) $(LDFLAGS) -lm -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)
 
 ssh-slh-dsa-test: $(LIBCOMPAT) libssh.a $(SSH_SLH_DSA_TEST_OBJ)
 	$(LD) -o $@ $(SSH_SLH_DSA_TEST_OBJ) $(LDFLAGS) -rpath /Users/tln/cs/masters/liboqs/build/lib -lssh -lopenbsd-compat $(LIBS) $(CHANNELLIBS)

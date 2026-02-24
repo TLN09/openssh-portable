@@ -72,6 +72,7 @@
 #include "channels.h" /* XXX for session.h */
 #include "session.h" /* XXX for child_set_env(); refactor? */
 #include "sk-api.h"
+#include "ssh-ml-kem-auth.h"
 
 /* import */
 extern ServerOptions options;
@@ -102,13 +103,16 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 	int req_presence = 0, req_verify = 0, authenticated = 0;
 	struct sshauthopt *authopts = NULL;
 	struct sshkey_sig_details *sig_details = NULL;
+	u_char *challenge = NULL;
+	size_t challenge_len;
+	debug_f("STARTING");
 
 	hostbound = strcmp(method, "publickey-hostbound-v00@openssh.com") == 0;
-
 	if ((r = sshpkt_get_u8(ssh, &have_sig)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &pkalg, NULL)) != 0 ||
 	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0)
 		fatal_fr(r, "parse %s packet", method);
+	debug_f("HAVE_SIG: %d", have_sig);
 
 	/* hostbound auth includes the hostkey offered at initial KEX */
 	if (hostbound) {
@@ -203,33 +207,52 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 			debug2_f("disabled because of invalid user");
 			goto done;
 		}
-		/* reconstruct packet */
+		authenticated = 0;
+		debug_f("KEY_ML_KEM_AUTH %d", key->type == KEY_ML_KEM_AUTH);
 		xasprintf(&userstyle, "%s%s%s", authctxt->user,
-		    authctxt->style ? ":" : "",
-		    authctxt->style ? authctxt->style : "");
+			authctxt->style ? ":" : "",
+			authctxt->style ? authctxt->style : "");
 		if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
-		    (r = sshbuf_put_cstring(b, userstyle)) != 0 ||
-		    (r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
-		    (r = sshbuf_put_cstring(b, method)) != 0 ||
-		    (r = sshbuf_put_u8(b, have_sig)) != 0 ||
-		    (r = sshbuf_put_cstring(b, pkalg)) != 0 ||
-		    (r = sshbuf_put_string(b, pkblob, blen)) != 0)
+			(r = sshbuf_put_cstring(b, userstyle)) != 0 ||
+			(r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
+			(r = sshbuf_put_cstring(b, method)) != 0 ||
+			(r = sshbuf_put_u8(b, have_sig)) != 0 ||
+			(r = sshbuf_put_cstring(b, pkalg)) != 0 ||
+			(r = sshbuf_put_string(b, pkblob, blen)) != 0)
 			fatal_fr(r, "reconstruct %s packet", method);
 		if (hostbound &&
-		    (r = sshkey_puts(ssh->kex->initial_hostkey, b)) != 0)
+			(r = sshkey_puts(ssh->kex->initial_hostkey, b)) != 0)
 			fatal_fr(r, "reconstruct %s packet", method);
+		switch (key->type) {
+			case KEY_ML_KEM_AUTH:
+				// check if recieved "signature" matches the shared secret generated for the challenge string
+				if ((r = sshbuf_put_string(b, authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH)) != 0) {
+				    fatal_fr(r, "failed putting shared secret into data buffer");
+				}
+				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
+    			        mm_sshkey_verify(key, sig, slen,
+    					sshbuf_ptr(b), sshbuf_len(b),
+    					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
+    					ssh->compat, &sig_details) == 0) {
+					authenticated = 1;
+				}
+				break;
+			default:
 #ifdef DEBUG_PK
-		sshbuf_dump(b, stderr);
+				sshbuf_dump(b, stderr);
 #endif
-		/* test for correct signature */
-		authenticated = 0;
-		if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
-		    mm_sshkey_verify(key, sig, slen,
-		    sshbuf_ptr(b), sshbuf_len(b),
-		    (ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
-		    ssh->compat, &sig_details) == 0) {
-			authenticated = 1;
+				/* test for correct signature */
+				if (mm_user_key_allowed(ssh, pw, key, 1, &authopts) &&
+					mm_sshkey_verify(key, sig, slen,
+					sshbuf_ptr(b), sshbuf_len(b),
+					(ssh->compat & SSH_BUG_SIGTYPE) == 0 ? pkalg : NULL,
+					ssh->compat, &sig_details) == 0) {
+					authenticated = 1;
+				}
+				break;
+
 		}
+
 		if (authenticated == 1 && sig_details != NULL) {
 			auth2_record_info(authctxt, "signature count = %u",
 			    sig_details->sk_counter);
@@ -285,15 +308,47 @@ userauth_pubkey(struct ssh *ssh, const char *method)
 		 * if a user is not allowed to login. is this an
 		 * issue? -markus
 		 */
+
+		if (key->type == KEY_ML_KEM_AUTH) {
+			// Create the KEM challenge string and save shared secret generated
+			authctxt->methoddata = malloc(ML_KEM_AUTH_SS_LENGTH);
+			sshkey_sign(key,
+				&challenge, &challenge_len,
+				authctxt->methoddata, ML_KEM_AUTH_SS_LENGTH,
+				NULL, NULL, NULL, 0);
+		}
 		if (mm_user_key_allowed(ssh, pw, key, 0, NULL)) {
-			if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
-			    != 0 ||
-			    (r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
-			    (r = sshpkt_put_string(ssh, pkblob, blen)) != 0 ||
-			    (r = sshpkt_send(ssh)) != 0 ||
-			    (r = ssh_packet_write_wait(ssh)) != 0)
-				fatal_fr(r, "send packet");
-			authctxt->postponed = 1;
+			switch (key->type) {
+				case KEY_ML_KEM_AUTH:
+					// Also send challenge string for KEM authentication
+					char *tmp = malloc(challenge_len * 2 + 1);
+					for (int i = 0; i < challenge_len; i++)
+						sprintf(tmp + (i * 2), "%02x", challenge[i]);
+					tmp[challenge_len * 2] = '\0';
+					debug_f("challenge string: %s", tmp);
+					free(tmp);
+
+					if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
+						!= 0 ||
+						(r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
+						(r = sshpkt_put_string(ssh, pkblob, blen)) != 0 ||
+						(r = sshpkt_put_string(ssh, challenge, challenge_len)) != 0 ||
+						(r = sshpkt_send(ssh)) != 0 ||
+						(r = ssh_packet_write_wait(ssh)) != 0)
+						fatal_fr(r, "send packet");
+					authctxt->postponed = 1;
+					break;
+				default:
+					if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
+						!= 0 ||
+						(r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
+						(r = sshpkt_put_string(ssh, pkblob, blen)) != 0 ||
+						(r = sshpkt_send(ssh)) != 0 ||
+						(r = ssh_packet_write_wait(ssh)) != 0)
+						fatal_fr(r, "send packet");
+					authctxt->postponed = 1;
+					break;
+			}
 		}
 	}
 done:
@@ -313,6 +368,8 @@ done:
 	free(key_s);
 	free(ca_s);
 	free(sig);
+	if (challenge != NULL)
+		free(challenge);
 	sshkey_sig_details_free(sig_details);
 	return authenticated;
 }

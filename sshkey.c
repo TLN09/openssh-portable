@@ -114,6 +114,7 @@ extern const struct sshkey_impl sshkey_rsa_sha256_cert_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_impl;
 extern const struct sshkey_impl sshkey_rsa_sha512_cert_impl;
 extern const struct sshkey_impl sshkey_ml_dsa_impl;
+extern const struct sshkey_impl sshkey_ml_kem_auth_impl;
 #endif /* WITH_OPENSSL */
 extern const struct sshkey_impl sshkey_slh_dsa_impl;
 
@@ -147,6 +148,7 @@ const struct sshkey_impl * const keyimpls[] = {
 	&sshkey_rsa_sha512_impl,
 	&sshkey_rsa_sha512_cert_impl,
 	&sshkey_ml_dsa_impl,
+	&sshkey_ml_kem_auth_impl,
 #endif /* WITH_OPENSSL */
 	&sshkey_slh_dsa_impl,
 	NULL
@@ -2006,8 +2008,8 @@ sshkey_from_blob_internal(struct sshbuf *b, struct sshkey **keyp,
 		ret = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
-		debug3_f("sshbuf_get_cstring failed");
+	if ((ret = sshbuf_get_cstring(b, &ktype, NULL)) != 0) {
+		debug3_fr(ret, "sshbuf_get_cstring failed");
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
@@ -3235,8 +3237,8 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 		goto out;
 
 	debug3_f("checking if private key matches public key");
-	/* Check that the public key in the envelope matches the private key */
 	if (!sshkey_equal(pubkey, k)) {
+	/* Check that the public key in the envelope matches the private key */
 		debug3_f("TEST");
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
@@ -3411,6 +3413,7 @@ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
 	case KEY_ECDSA:
 	case KEY_RSA:
 	case KEY_ML_DSA:
+	case KEY_ML_KEM_AUTH:
 		break; /* see below */
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:

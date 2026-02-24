@@ -516,7 +516,7 @@ ssh_ml_dsa_verify(
     const struct sshkey *key,
     const u_char *sig, 
     size_t siglen,
-    const u_char *data, 
+    u_char *data, 
     size_t datalen, 
     const char *alg, 
     u_int compat,

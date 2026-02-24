@@ -277,6 +277,8 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 	if (authctxt == NULL)
 		fatal("input_userauth_request: no authctxt");
 
+	debug_f("Why is my string too large here?");
+
 	if ((r = sshpkt_get_cstring(ssh, &user, NULL)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &service, NULL)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &method, NULL)) != 0)
@@ -805,4 +807,3 @@ auth2_update_session_info(Authctxt *authctxt, const char *method,
 	if ((r = sshbuf_put_u8(authctxt->session_info, '\n')) != 0)
 		fatal_fr(r, "append");
 }
-

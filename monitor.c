@@ -26,6 +26,7 @@
  */
 
 #include "includes.h"
+#include "ssh-ml-kem-auth.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -1365,7 +1366,8 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 	struct sshkey *hostkey = NULL;
 	const u_char *p;
 	char *userstyle, *cp;
-	size_t len;
+	u_char *pkalg;
+	size_t len, pkalg_len;
 	u_char type;
 	int hostbound = 0, r, fail = 0;
 
@@ -1419,10 +1421,17 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 		fatal_fr(r, "parse pktype");
 	if (type == 0)
 		fail++;
-	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkalg */
-	    (r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
+	if ((r = sshbuf_get_string(b, &pkalg, &pkalg_len)) != 0) {
+	    fatal_fr(r, "parse pkalg failed");
+	}
+	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
 	    (hostbound && (r = sshkey_froms(b, &hostkey)) != 0))
 		fatal_fr(r, "parse pk");
+	if (sshkey_type_from_name(pkalg) == KEY_ML_KEM_AUTH) {
+	    if ((r = sshbuf_skip_string(b)) != 0) /* shared secret data from authctxt */ {
+			fail++;
+		}
+	}
 	if (sshbuf_len(b) != 0)
 		fail++;
 	sshbuf_free(b);
@@ -1562,12 +1571,32 @@ mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
 	    SSH_FP_DEFAULT)) == NULL)
 		fatal_f("sshkey_fingerprint failed");
 
-	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
-	    sigalg, ssh->compat, &sig_details);
-	debug3_f("%s %s signature using %s %s%s%s", auth_method,
-	    sshkey_type(key), sigalg == NULL ? "default" : sigalg,
-	    (ret == 0) ? "verified" : "unverified",
-	    (ret != 0) ? ": " : "", (ret != 0) ? ssh_err(ret) : "");
+	switch (key->type) {
+    case KEY_ML_KEM_AUTH:
+		ret = 1;
+		if (signaturelen != ML_KEM_AUTH_SS_LENGTH) {
+		    debug_f("signature length: %d, datalen: %d", signaturelen);
+		    ret = 0;
+		}
+		// Skip over all other data than the shared secret value in the final 32 bytes.
+		data += datalen - ML_KEM_AUTH_SS_LENGTH;
+		for (int i = 0; ret && i < ML_KEM_AUTH_SS_LENGTH; i++) {
+			ret &= signature[i] == data[i];
+		}
+		// If `ret == 1` then we have successfully verified
+		// However `ret` should be 0 if successful therefore it is negated
+		ret = !ret;
+		break;
+
+	default:
+       	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
+       	    sigalg, ssh->compat, &sig_details);
+	    break;
+	}
+   	debug3_f("%s %s signature using %s %s%s%s", auth_method,
+   	    sshkey_type(key), sigalg == NULL ? "default" : sigalg,
+   	    (ret == 0) ? "verified" : "unverified",
+   	    (ret != 0) ? ": " : "", (ret != 0) ? ssh_err(ret) : "");
 
 	if (ret == 0 && key_blobtype == MM_USERKEY && sig_details != NULL) {
 		req_presence = (options.pubkey_auth_options &
@@ -2070,4 +2099,3 @@ mm_answer_gss_userok(struct ssh *ssh, int sock, struct sshbuf *m)
 	return (authenticated);
 }
 #endif /* GSSAPI */
-

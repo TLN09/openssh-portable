@@ -408,7 +408,7 @@ ssh_ecdsa_encode_store_sig(const struct sshkey *key,
 static int
 ssh_ecdsa_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
-    const u_char *data, size_t dlen, const char *alg, u_int compat,
+    u_char *data, size_t dlen, const char *alg, u_int compat,
     struct sshkey_sig_details **detailsp)
 {
 	ECDSA_SIG *esig = NULL;

@@ -279,6 +279,9 @@ ask_filename(struct passwd *pw, const char *prompt)
 		case KEY_SLH_DSA:
 			name = _PATH_SSH_CLIENT_ID_SLH_DSA;
 			break;
+		case KEY_ML_KEM_AUTH:
+			name = _PATH_SSH_CLIENT_ID_ML_KEM_AUTH;
+			break;
 		default:
 			fatal("bad key type");
 		}

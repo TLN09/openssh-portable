@@ -124,7 +124,7 @@ ssh_ed25519_sk_deserialize_private(const char *ktype, struct sshbuf *b,
 static int
 ssh_ed25519_sk_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
-    const u_char *data, size_t dlen, const char *alg, u_int compat,
+    u_char *data, size_t dlen, const char *alg, u_int compat,
     struct sshkey_sig_details **detailsp)
 {
 	struct sshbuf *b = NULL;

@@ -495,7 +495,7 @@ ssh_rsa_encode_store_sig(int hash_alg, const u_char *sig, size_t slen,
 static int
 ssh_rsa_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
-    const u_char *data, size_t dlen, const char *alg, u_int compat,
+    u_char *data, size_t dlen, const char *alg, u_int compat,
     struct sshkey_sig_details **detailsp)
 {
 	char *sigtype = NULL;

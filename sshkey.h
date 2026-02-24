@@ -71,6 +71,7 @@ enum sshkey_types {
 	KEY_ED25519_SK_CERT,
 	KEY_ML_DSA,
 	KEY_SLH_DSA,
+	KEY_ML_KEM_AUTH,
 	KEY_UNSPEC
 };
 
@@ -174,7 +175,7 @@ struct sshkey_impl_funcs {
 	    const u_char *, size_t, const char *,
 	    const char *, const char *, u_int); /* optional */
 	int (*verify)(const struct sshkey *, const u_char *, size_t,
-	    const u_char *, size_t, const char *, u_int,
+	    u_char *, size_t, const char *, u_int,
 	    struct sshkey_sig_details **);
 };
 
