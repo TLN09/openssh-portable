@@ -47,7 +47,7 @@ ssh_slh_dsa_size(
     return key->oqs_sig->length_public_key;
 }
 
-int 
+int
 ssh_slh_dsa_alloc(
     struct sshkey *key
 ) {
@@ -82,7 +82,7 @@ ssh_slh_dsa_equal(
 int
 ssh_slh_dsa_serialize_public(
     const struct sshkey *key,
-    struct sshbuf *buffer, 
+    struct sshbuf *buffer,
     enum sshkey_serialize_rep options
 ) {
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -95,15 +95,15 @@ ssh_slh_dsa_serialize_public(
         fprintf(stderr, "failed putting public key data into sshbuf\n");
         return r;
     }
-    
+
     // Success
     return 0;
 }
 
 int
 ssh_slh_dsa_deserialize_public(
-    const char *key_type, 
-    struct sshbuf *buffer, 
+    const char *key_type,
+    struct sshbuf *buffer,
     struct sshkey *key
 ) {
     u_int32_t length;
@@ -154,7 +154,7 @@ ssh_slh_dsa_deserialize_public(
 
     // Success
     r = 0;
-    
+
   out:
     free(method_name);
     if (r != 0) {
@@ -184,22 +184,22 @@ ssh_slh_dsa_serialize_private(
         fprintf(stderr, "failed putting secret key data into sshbuf\n");
         return r;
     }
-    
+
     // hack to allow for private keys to also know the public key.
     // Used to check it is the correct key when loading them during authentication
     if ((r = sshbuf_put_string(buffer, key->slh_dsa_pk, key->oqs_sig->length_public_key)) != 0) {
         fprintf(stderr, "failed putting public key data into sshbuf\n");
         return r;
     }
-    
+
     // Success
     return 0;
 }
 
 int
 ssh_slh_dsa_deserialize_private(
-    const char *key_type, 
-    struct sshbuf *buffer, 
+    const char *key_type,
+    struct sshbuf *buffer,
     struct sshkey *key
 ) {
     u_int32_t length;
@@ -247,7 +247,7 @@ ssh_slh_dsa_deserialize_private(
     buf_ptr = sshbuf_ptr(buffer);
     memcpy(key->slh_dsa_sk, buf_ptr, length_secret_key);
     sshbuf_consume(buffer, length_secret_key); // Tell the buffer you have read its contents
-    
+
     if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
         fprintf(stderr, "failed getting public key length\n");
         goto out;
@@ -268,11 +268,11 @@ ssh_slh_dsa_deserialize_private(
     buf_ptr = sshbuf_ptr(buffer);
     memcpy(key->slh_dsa_pk, buf_ptr, length_public_key);
     sshbuf_consume(buffer, length_public_key); // Tell the buffer you have read its contents
-    
+
 
     // Success
     r = 0;
-    
+
   out:
     free(method_name);
     if (r != 0) {
@@ -298,13 +298,22 @@ ssh_slh_dsa_generate(
         case 128:
             type = OQS_SIG_alg_slh_dsa_pure_sha2_128s;
             break;
+        case 129:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_128f;
+            break;
         case 192:
             type = OQS_SIG_alg_slh_dsa_pure_sha2_192s;
+            break;
+        case 193:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_192f;
             break;
         case 256:
             type = OQS_SIG_alg_slh_dsa_pure_sha2_256s;
             break;
-    
+        case 257:
+            type = OQS_SIG_alg_slh_dsa_pure_sha2_256f;
+            break;
+
         default:
             r = SSH_ERR_INVALID_ARGUMENT;
             goto out;
@@ -319,7 +328,7 @@ ssh_slh_dsa_generate(
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
-	
+
     if ((key->slh_dsa_sk = OQS_MEM_malloc(key->oqs_sig->length_secret_key)) == NULL) {
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
@@ -329,21 +338,21 @@ ssh_slh_dsa_generate(
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
-    
+
     /* success */
     r = 0;
 
   out:
     if (r != 0) {
         OQS_MEM_insecure_free(key->slh_dsa_pk);
-        if (key->oqs_sig != NULL) { 
+        if (key->oqs_sig != NULL) {
             OQS_MEM_secure_free(key->slh_dsa_sk, key->oqs_sig->length_secret_key);
             // Documentation does not say it can be called on a null pointer
             // Better safe than sorry
             OQS_SIG_free(key->oqs_sig);
         }
     }
-  
+
     return r;
 }
 
@@ -369,7 +378,7 @@ ssh_slh_dsa_copy_public(
     return 0;
 }
 
-int 
+int
 ssh_slh_dsa_encode_store_sig(
     uint8_t *sig,
     size_t sig_len,
@@ -404,7 +413,7 @@ ssh_slh_dsa_encode_store_sig(
     }
     if (lenp != NULL)
         *lenp = len;
-    
+
     r = 0;
 
   out:
@@ -418,10 +427,10 @@ ssh_slh_dsa_sign(
     u_char **sigp,
     size_t *lenp,
     const u_char *data,
-    size_t datalen, 
-    const char *alg, 
-    const char *sk_provider, 
-    const char *sk_pin, 
+    size_t datalen,
+    const char *alg,
+    const char *sk_provider,
+    const char *sk_pin,
     u_int compat
 ) {
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -457,11 +466,11 @@ ssh_slh_dsa_sign(
 int
 ssh_slh_dsa_verify(
     const struct sshkey *key,
-    const u_char *sig, 
+    const u_char *sig,
     size_t siglen,
-    u_char *data, 
-    size_t datalen, 
-    const char *alg, 
+    u_char *data,
+    size_t datalen,
+    const char *alg,
     u_int compat,
     struct sshkey_sig_details **detailsp
 ) {
@@ -474,7 +483,7 @@ ssh_slh_dsa_verify(
         r = SSH_ERR_ALLOC_FAIL;
         goto out;
     }
-    
+
     if (sshbuf_get_cstring(b, &signature_type, NULL) != 0) {
         debug3_f("Failed getting signature type from buffer\n");
         r = SSH_ERR_INVALID_FORMAT;
