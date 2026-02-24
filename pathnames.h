@@ -40,6 +40,7 @@
 #define _PATH_HOST_ED25519_KEY_FILE	SSHDIR "/ssh_host_ed25519_key"
 #define _PATH_HOST_RSA_KEY_FILE		SSHDIR "/ssh_host_rsa_key"
 #define _PATH_HOST_ML_DSA_KEY_FILE	SSHDIR "/ssh_host_ml_dsa_key"
+#define _PATH_HOST_SLH_DSA_KEY_FILE	SSHDIR "/ssh_host_slh_dsa_key"
 #define _PATH_DH_MODULI			SSHDIR "/moduli"
 
 #ifndef _PATH_SSH_PROGRAM

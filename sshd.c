@@ -1665,6 +1665,7 @@ main(int ac, char **av)
 		case KEY_ECDSA_SK:
 		case KEY_ED25519_SK:
 		case KEY_ML_DSA:
+		case KEY_SLH_DSA:
 			if (have_agent || key != NULL)
 				sensitive_data.have_ssh2_key = 1;
 			break;

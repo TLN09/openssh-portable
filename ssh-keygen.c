@@ -1025,6 +1025,9 @@ do_gen_all_hostkeys(struct passwd *pw)
 #endif /* OPENSSL_HAS_ECC */
 #endif /* WITH_OPENSSL */
 		{ "ed25519", "ED25519",_PATH_HOST_ED25519_KEY_FILE },
+#ifdef WITH_OPEN_QUANTUM_SAFE
+        { "slh-dsa", "SLH-DSA" ,_PATH_HOST_SLH_DSA_KEY_FILE },
+#endif /* WITH_OPEN_QUANTUM_SAFE */
 		{ NULL, NULL, NULL }
 	};
 
