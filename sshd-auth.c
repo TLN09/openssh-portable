@@ -263,6 +263,10 @@ list_hostkey_types(void)
 			debug3_f("appending slh-dsa hostkey type");
 			append_hostkey_type(b, "ssh-slh-dsa");
 			break;
+		case KEY_ML_KEM_AUTH:
+			debug3_f("appending ml-kem-auth hostkey type");
+			append_hostkey_type(b, "ssh-ml-kem-auth");
+			break;
 		}
 		/* If the private key has a cert peer, then list that too */
 		key = host_certificates[i];
