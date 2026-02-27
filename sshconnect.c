@@ -1616,13 +1616,13 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 	/* key exchange */
 	/* authenticate user */
 	debug("Authenticating to %s:%d as '%s'", host, port, server_user);
-	ssh_kex2(ssh, host, hostaddr, port, cinfo);
+	ssh_kex2(ssh, host, hostaddr, port, cinfo, pw->pw_uid);
 	if (!options.kex_algorithms_set && ssh->kex != NULL &&
 	    ssh->kex->name != NULL && options.warn_weak_crypto &&
 	    !kex_is_pq_from_name(ssh->kex->name))
 		warn_nonpq_kex();
-	
-	
+
+
 	debug3_f("user authentication starting");
 	start = monotime_double();
 	ssh_userauth2(ssh, local_user, server_user, host, sensitive);

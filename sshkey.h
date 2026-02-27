@@ -220,6 +220,7 @@ int	 sshkey_is_cert(const struct sshkey *);
 int	 sshkey_is_sk(const struct sshkey *);
 int	 sshkey_type_is_cert(int);
 int	 sshkey_type_plain(int);
+int	sshkey_copy_public(const struct sshkey *from, struct sshkey *to);
 
 /* Returns non-zero if key name match sigalgs pattern list. (handles RSA) */
 int	 sshkey_match_keyname_to_sigalgs(const char *, const char *);

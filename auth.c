@@ -420,7 +420,6 @@ check_key_in_hostfiles(struct passwd *pw, struct sshkey *key, const char *host,
 	HostStatus host_status;
 	struct hostkeys *hostkeys;
 	const struct hostkey_entry *found;
-
 	hostkeys = init_hostkeys();
 	load_hostkeys(hostkeys, host, sysfile, 0);
 	if (userfile != NULL) {

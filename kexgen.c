@@ -32,6 +32,7 @@
 #include <string.h>
 #include <signal.h>
 
+#include "ssh-ml-kem-auth.h"
 #include "sshkey.h"
 #include "kex.h"
 #include "log.h"
@@ -129,10 +130,25 @@ kex_gen_client(struct ssh *ssh)
 	}
 	if (r != 0)
 		return r;
-	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
-	    (r = sshpkt_put_stringb(ssh, kex->client_pub)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		return r;
+	if (kex->hostkey_type == KEY_ML_KEM_AUTH) {
+	    kex->host_authentication_challenge = malloc(ML_KEM_AUTH_SS_LENGTH);
+		u_char *ct;
+		size_t ct_len;
+	    sshkey_sign(kex->initial_hostkey,
+					&ct, &ct_len,
+					kex->host_authentication_challenge, ML_KEM_AUTH_SS_LENGTH,
+					NULL, NULL, NULL, 0);
+        if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
+       	    (r = sshpkt_put_stringb(ssh, kex->client_pub)) != 0 ||
+       	    (r = sshpkt_put_string(ssh, ct, ct_len)) != 0 ||
+       	    (r = sshpkt_send(ssh)) != 0)
+      		return r;
+	} else {
+    	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
+    	    (r = sshpkt_put_stringb(ssh, kex->client_pub)) != 0 ||
+    	    (r = sshpkt_send(ssh)) != 0)
+    		return r;
+	}
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_gen_reply);
 	return 0;
@@ -221,9 +237,26 @@ input_kex_gen_reply(int type, u_int32_t seq, struct ssh *ssh)
 	    hash, &hashlen)) != 0)
 		goto out;
 
-	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
-	    kex->hostkey_alg, ssh->compat, NULL)) != 0)
-		goto out;
+
+	if (server_host_key->type == KEY_ML_KEM_AUTH) {
+	    if (slen != ML_KEM_AUTH_SS_LENGTH) {
+			r = SSH_ERR_SIGNATURE_INVALID;
+			goto out;
+		}
+	    int valid = 1;
+		for (int i = 0; valid && i < ML_KEM_AUTH_SS_LENGTH; i++) {
+			valid &= signature[i] == kex->host_authentication_challenge[i];
+		}
+		if (!valid) {
+		    r = SSH_ERR_SIGNATURE_INVALID;
+			goto out;
+		}
+	} else {
+    	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
+    	    kex->hostkey_alg, ssh->compat, NULL)) != 0) {
+    		goto out;
+    	}
+	}
 
 	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
 	    (r = kex_send_newkeys(ssh)) != 0)
@@ -291,9 +324,16 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	    &server_host_public)) != 0)
 		goto out;
 
-	if ((r = sshpkt_getb_froms(ssh, &client_pubkey)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
-		goto out;
+	if (server_host_public->type == KEY_ML_KEM_AUTH) {
+        if ((r = sshpkt_getb_froms(ssh, &client_pubkey)) != 0 ||
+            (r = sshpkt_get_string(ssh, &kex->host_authentication_challenge, &kex->host_challenge_len)) != 0 ||
+    	    (r = sshpkt_get_end(ssh)) != 0)
+    		goto out;
+	} else {
+    	if ((r = sshpkt_getb_froms(ssh, &client_pubkey)) != 0 ||
+    	    (r = sshpkt_get_end(ssh)) != 0)
+    		goto out;
+	}
 
 	/* compute shared secret */
 	switch (kex->kex_type) {
@@ -352,9 +392,18 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	/* sign H */
-	if ((r = kex->sign(ssh, server_host_private, server_host_public,
-	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) != 0)
-		goto out;
+	if (server_host_public->type == KEY_ML_KEM_AUTH) {
+	    signature = malloc(ML_KEM_AUTH_SS_LENGTH);
+		if ((r = sshkey_verify(server_host_private,
+		        kex->host_authentication_challenge, kex->host_challenge_len,
+				signature, ML_KEM_AUTH_SS_LENGTH, NULL, 0, NULL)) != 0) {
+			goto out;
+		}
+	} else {
+    	if ((r = kex->sign(ssh, server_host_private, server_host_public,
+    	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) != 0)
+    		goto out;
+	}
 
 	/* send server hostkey, ECDH pubkey 'Q_S' and signed H */
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_REPLY)) != 0 ||

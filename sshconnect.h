@@ -87,7 +87,7 @@ void	 get_hostfile_hostname_ipaddr(char *, struct sockaddr *, u_short,
     char **, char **);
 
 void	 ssh_kex2(struct ssh *ssh, char *, struct sockaddr *, u_short,
-    const struct ssh_conn_info *);
+    const struct ssh_conn_info *, const uid_t);
 
 void	 ssh_userauth2(struct ssh *ssh, const char *, const char *,
     char *, Sensitive *);

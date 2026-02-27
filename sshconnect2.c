@@ -26,6 +26,7 @@
 
 #include "includes.h"
 
+#include <sys/_types/_uid_t.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -217,7 +218,7 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port,
 
 void
 ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
-    const struct ssh_conn_info *cinfo)
+    const struct ssh_conn_info *cinfo, const uid_t uid)
 {
 	char *myproposal[PROPOSAL_MAX];
 	char *all_key, *hkalgs = NULL;
@@ -256,6 +257,30 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	    compression_alg_list(options.compression),
 	    hkalgs ? hkalgs : options.hostkeyalgorithms);
 
+	// if ml-kem-auth is a hostkey algorithm
+	// load known hostkey and save as initial key
+	// Should be freed if hostkey algoritm is later chosen to not ssh-ml-kem-auth
+	debug3_f("TEST");
+	char *hostname;
+	char *hostfile_ipaddr;
+	get_hostfile_hostname_ipaddr(host, hostaddr, port, &hostname, &hostfile_ipaddr);
+	struct hostkeys *hostkeys = init_hostkeys();
+	const struct hostkey_entry *found;
+	char * path = tilde_expand_filename(_PATH_SSH_USER_HOSTFILE, uid);
+	if (match_pattern_list("ssh-ml-kem-auth", hkalgs ? hkalgs : options.hostkeyalgorithms, 0) == 1) {
+		load_hostkeys(hostkeys, hostname, path, 0);
+		if (lookup_key_in_hostkeys_by_type(hostkeys, KEY_ML_KEM_AUTH, 0, &found) == 0) {
+		    goto hostkey_not_found;
+		}
+		ssh->kex->initial_hostkey = sshkey_new(KEY_ML_KEM_AUTH);
+		sshkey_copy_public(found->key, ssh->kex->initial_hostkey);
+	}
+
+  hostkey_not_found:
+    free_hostkeys(hostkeys);
+    free(hostname);
+    free(hostfile_ipaddr);
+    free(path);
 	free(hkalgs);
 
 	/* start key exchange */
