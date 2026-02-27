@@ -396,7 +396,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* sign H */
 	debug_f("'signing' hash");
-	if (server_host_public->type == KEY_ML_KEM_AUTH) {
+	if (server_host_private->type == KEY_ML_KEM_AUTH) {
 	    debug_f("allocating signature buffer");
 	    signature = malloc(ML_KEM_AUTH_SS_LENGTH);
 		if ((r = sshkey_verify(server_host_private,
@@ -407,7 +407,6 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		}
 		debug_f("'signed' hash");
 	} else {
-
     	if ((r = kex->sign(ssh, server_host_private, server_host_public,
     	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) != 0)
     		goto out;
