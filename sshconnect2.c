@@ -26,7 +26,6 @@
 
 #include "includes.h"
 
-#include <sys/_types/_uid_t.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
