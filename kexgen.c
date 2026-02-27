@@ -336,6 +336,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
     		goto out;
 	}
 
+	debug_f("computing shared secret");
 	/* compute shared secret */
 	switch (kex->kex_type) {
 #ifdef WITH_OPENSSL
@@ -371,6 +372,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	if (r !=0 )
 		goto out;
 
+	debug_f("calculating hash");
 	/* calc H */
 	if ((server_host_key_blob = sshbuf_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
@@ -393,6 +395,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	/* sign H */
+	debug_f("'signing' hash");
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
 	    signature = malloc(ML_KEM_AUTH_SS_LENGTH);
 		if ((r = sshkey_verify(server_host_private,
@@ -400,6 +403,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 				signature, ML_KEM_AUTH_SS_LENGTH, NULL, 0, NULL)) != 0) {
 			goto out;
 		}
+		debug_f("'signed' hash");
 	} else {
     	if ((r = kex->sign(ssh, server_host_private, server_host_public,
     	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) != 0)
@@ -407,6 +411,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* send server hostkey, ECDH pubkey 'Q_S' and signed H */
+	debug_f("sending hostkey and 'signature'");
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_REPLY)) != 0 ||
 	    (r = sshpkt_put_stringb(ssh, server_host_key_blob)) != 0 ||
 	    (r = sshpkt_put_stringb(ssh, server_pubkey)) != 0 ||
@@ -414,6 +419,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
 
+	debug_f("deriving keys");
 	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
 	    (r = kex_send_newkeys(ssh)) != 0)
 		goto out;
