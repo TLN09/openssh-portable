@@ -324,7 +324,8 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	    &server_host_public)) != 0)
 		goto out;
 
-	debug_f("hostkey_type: %d", server_host_public->type);
+	debug_f("server_host_public->type: %d", server_host_public->type);
+	debug_f("server_host_private->type: %d", server_host_private->type);
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
         if ((r = sshpkt_getb_froms(ssh, &client_pubkey)) != 0 ||
             (r = sshpkt_get_string(ssh, &kex->host_authentication_challenge, &kex->host_challenge_len)) != 0 ||
