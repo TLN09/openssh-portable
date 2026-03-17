@@ -399,9 +399,11 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
 	    debug_f("allocating signature buffer");
 	    signature = malloc(ML_KEM_AUTH_SS_LENGTH);
-		if ((r = kex->verify(ssh, server_host_private, server_host_public,
-		        kex->host_authentication_challenge, kex->host_challenge_len,
-				signature, ML_KEM_AUTH_SS_LENGTH, NULL)) != 0) {
+		slen = ML_KEM_AUTH_SS_LENGTH;
+		if ((r = kex->sign(ssh, server_host_private, server_host_public,
+				&signature, &slen,
+				kex->host_authentication_challenge,
+				kex->host_challenge_len, kex->hostkey_alg)) != 0) {
 			debug_f("Failed 'signing' hash");
 			goto out;
 		}
