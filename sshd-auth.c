@@ -815,6 +815,21 @@ sshd_hostkey_sign(struct ssh *ssh, struct sshkey *privkey,
 	return 0;
 }
 
+int
+sshd_hostkey_verify(struct ssh *ssh, struct sshkey *privkey,
+    struct sshkey *pubkey, u_char *signature, size_t slenp,
+    u_char *data, size_t dlen, const char *alg) {
+    if (privkey) {
+        if (mm_sshkey_verify(privkey, signature, slenp,
+        data, dlen, alg, ssh->compat, NULL) < 0)
+            fatal_f("privkey verify failed");
+    } else {
+        if (mm_sshkey_verify(pubkey, signature, slenp,
+        data, dlen, alg, ssh->compat, NULL) < 0)
+            fatal_f("pubkey verify failed");
+    }
+}
+
 /* SSH2 key exchange */
 static void
 do_ssh2_kex(struct ssh *ssh)
@@ -862,6 +877,7 @@ do_ssh2_kex(struct ssh *ssh)
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
 	kex->sign = sshd_hostkey_sign;
+	kex->verify = sshd_hostkey_verify;
 
 	ssh_dispatch_run_fatal(ssh, DISPATCH_BLOCK, &kex->done);
 	kex_proposal_free_entries(myproposal);

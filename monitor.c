@@ -770,11 +770,13 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	}
 
 	if ((key = get_hostkey_by_index(keyid)) != NULL) {
+	    debug_f("MM_ANSWER_SIGN: SIGNING USING SSHKEY_SIGN");
 		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen, alg,
 		    options.sk_provider, NULL, compat)) != 0)
 			fatal_fr(r, "sign");
 	} else if ((key = get_hostkey_public_by_index(keyid, ssh)) != NULL &&
 	    auth_sock > 0) {
+		debug_f("MM_ANSWER_SIGN: SIGNING USING SSH_AGENT_SIGN");
 		if ((r = ssh_agent_sign(auth_sock, key, &signature, &siglen,
 		    p, datlen, alg, compat)) != 0)
 			fatal_fr(r, "agent sign");
@@ -1520,11 +1522,11 @@ monitor_valid_hostbasedblob(const u_char *data, u_int datalen,
 int
 mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
 {
-	struct sshkey *key;
+	struct sshkey *key, *privkey;
 	const u_char *signature, *data, *blob;
 	char *sigalg = NULL, *fp = NULL;
 	size_t signaturelen, datalen, bloblen;
-	int r, ret, req_presence = 0, req_verify = 0, valid_data = 0;
+	int r, ret, keyid, req_presence = 0, req_verify = 0, valid_data = 0;
 	int encoded_ret;
 	struct sshkey_sig_details *sig_details = NULL;
 
@@ -1573,20 +1575,32 @@ mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
 
 	switch (key->type) {
     case KEY_ML_KEM_AUTH:
-		ret = 1;
-		if (signaturelen != ML_KEM_AUTH_SS_LENGTH) {
-		    debug_f("signature length: %d, datalen: %d", signaturelen);
-		    ret = 0;
+		if (key_blobtype == MM_USERKEY) {
+            ret = 1;
+    		if (signaturelen != ML_KEM_AUTH_SS_LENGTH) {
+    		    debug_f("signature length: %d, datalen: %d", signaturelen);
+    		    ret = 0;
+    		}
+    		// Skip over all other data than the shared secret value in the final 32 bytes.
+    		data += datalen - ML_KEM_AUTH_SS_LENGTH;
+    		for (int i = 0; ret && i < ML_KEM_AUTH_SS_LENGTH; i++) {
+    			ret &= signature[i] == data[i];
+    		}
+    		// If `ret == 1` then we have successfully verified
+    		// However `ret` should be 0 if successful therefore it is negated
+    		ret = !ret;
+    		break;
+		} else {
+            // Get private key (see mm_answer_sign)
+            // Call verify to get shared secret from auth challenge string
+            if ((keyid = get_hostkey_index(key, 1, ssh)) == -1)
+                fatal_f("unknown hostkey");
+            if ((privkey = get_hostkey_by_index(keyid)) != NULL) {
+          		if ((r = sshkey_verify(privkey, signature, signaturelen,
+                data, datalen, NULL, 0, NULL)) != 0)
+         			fatal_fr(r, "verify");
+            }
 		}
-		// Skip over all other data than the shared secret value in the final 32 bytes.
-		data += datalen - ML_KEM_AUTH_SS_LENGTH;
-		for (int i = 0; ret && i < ML_KEM_AUTH_SS_LENGTH; i++) {
-			ret &= signature[i] == data[i];
-		}
-		// If `ret == 1` then we have successfully verified
-		// However `ret` should be 0 if successful therefore it is negated
-		ret = !ret;
-		break;
 
 	default:
        	ret = sshkey_verify(key, signature, signaturelen, data, datalen,

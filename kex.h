@@ -176,6 +176,9 @@ struct kex {
 	int	(*host_key_index)(struct sshkey *, int, struct ssh *);
 	int	(*sign)(struct ssh *, struct sshkey *, struct sshkey *,
 	    u_char **, size_t *, const u_char *, size_t, const char *);
+	int	(*verify)(struct ssh *, struct sshkey *,
+    struct sshkey *, u_char *, size_t ,
+    u_char *, size_t , const char *);
 	int	(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
 	DH	*dh;			/* DH */

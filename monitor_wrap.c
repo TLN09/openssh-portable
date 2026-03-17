@@ -77,6 +77,7 @@
 #include "srclimit.h"
 
 #include "ssherr.h"
+#include "ssh-ml-kem-auth.h"
 
 /* Imports */
 extern struct monitor *pmonitor;
@@ -573,7 +574,6 @@ mm_sshkey_verify(const struct sshkey *key, const u_char *sig, size_t siglen,
 	u_int counter;
 
 	debug3_f("entering");
-
 	if (sig_detailsp != NULL)
 		*sig_detailsp = NULL;
 	if ((m = sshbuf_new()) == NULL)
@@ -597,6 +597,12 @@ mm_sshkey_verify(const struct sshkey *key, const u_char *sig, size_t siglen,
 		if ((r = sshbuf_get_u32(m, &counter)) != 0 ||
 		    (r = sshbuf_get_u8(m, &flags)) != 0)
 			fatal_fr(r, "parse sig_details");
+		if (key->type == KEY_ML_KEM_AUTH && siglen != ML_KEM_AUTH_SS_LENGTH) {
+		    // This is the hostkey call. Read the challenge string "shared secret"
+			// from the monitor
+			if ((r = sshbuf_get_string(m, &data, &datalen)) != 0)
+			    fatal_fr(r, "failed getting authentication challenge shared secret");
+		}
 		if (sig_detailsp != NULL) {
 			*sig_detailsp = xcalloc(1, sizeof(**sig_detailsp));
 			(*sig_detailsp)->sk_counter = counter;
@@ -1233,4 +1239,3 @@ server_get_connection_info(struct ssh *ssh, int populate, int use_dns)
 	ci.rdomain = ssh_packet_rdomain_in(ssh);
 	return &ci;
 }
-
