@@ -612,6 +612,7 @@ mm_sshkey_verify(const struct sshkey *key, const u_char *sig, size_t siglen,
 
 	sshbuf_free(m);
 
+	debug_f("encoded_ret: %d", encoded_ret);
 	if (encoded_ret != 0)
 		return SSH_ERR_SIGNATURE_INVALID;
 	return 0;

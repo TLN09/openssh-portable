@@ -1592,6 +1592,7 @@ mm_answer_keyverify(struct ssh *ssh, int sock, struct sshbuf *m)
     		break;
 		} else {
 		    debug_f("Calling verify for hostkey");
+			ret = 1;
             // Get private key (see mm_answer_sign)
             // Call verify to get shared secret from auth challenge string
             if ((keyid = get_hostkey_index(key, 1, ssh)) == -1)
