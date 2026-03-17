@@ -259,7 +259,7 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	// if ml-kem-auth is a hostkey algorithm
 	// load known hostkey and save as initial key
 	// Should be freed if hostkey algoritm is later chosen to not ssh-ml-kem-auth
-	debug3_f("TEST");
+	debug3_f("hkalgs ? hkalgs : options.hostkeyalgorithms: %s", hkalgs ? hkalgs : options.hostkeyalgorithms);
 	char *hostname;
 	char *hostfile_ipaddr;
 	get_hostfile_hostname_ipaddr(host, hostaddr, port, &hostname, &hostfile_ipaddr);
@@ -267,12 +267,19 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	const struct hostkey_entry *found;
 	char * path = tilde_expand_filename(_PATH_SSH_USER_HOSTFILE, uid);
 	if (match_pattern_list("ssh-ml-kem-auth", hkalgs ? hkalgs : options.hostkeyalgorithms, 0) == 1) {
-		load_hostkeys(hostkeys, hostname, path, 0);
-		if (lookup_key_in_hostkeys_by_type(hostkeys, KEY_ML_KEM_AUTH, 0, &found) == 0) {
+		debug_f("Loading hostkeys");
+	    load_hostkeys(hostkeys, hostname, path, 0);
+		if (lookup_key_in_hostkeys_by_type(hostkeys, KEY_ML_KEM_AUTH, -1, &found) == 0) {
+		    debug_f("Hostkey not found");
 		    goto hostkey_not_found;
 		}
+		debug_f("Hostkey found");
 		ssh->kex->initial_hostkey = sshkey_new(KEY_ML_KEM_AUTH);
-		sshkey_copy_public(found->key, ssh->kex->initial_hostkey);
+		if ((r = sshkey_copy_public(found->key, ssh->kex->initial_hostkey)) != 0) {
+		    debug_fr(r, "Failed copying public hostkey");
+			goto hostkey_not_found;
+		}
+		debug_f("ssh->kex->initial_hostkey->pkey == NULL: %d", ssh->kex->initial_hostkey->pkey == NULL);
 	}
 
   hostkey_not_found:

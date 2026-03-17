@@ -350,7 +350,7 @@ static HostStatus
 check_hostkeys_by_key_or_type(struct hostkeys *hostkeys,
     struct sshkey *k, int keytype, int nid, const struct hostkey_entry **found)
 {
-	u_int i;
+    u_int i;
 	HostStatus end_return = HOST_NEW;
 	int want_cert = sshkey_is_cert(k);
 	HostkeyMarker want_marker = want_cert ? MRK_CA : MRK_NONE;
@@ -358,6 +358,7 @@ check_hostkeys_by_key_or_type(struct hostkeys *hostkeys,
 	if (found != NULL)
 		*found = NULL;
 
+	debug_f("Checking for hostkey of type: %d", keytype);
 	for (i = 0; i < hostkeys->num_entries; i++) {
 		if (hostkeys->entries[i].marker != want_marker)
 			continue;

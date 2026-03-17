@@ -134,10 +134,13 @@ kex_gen_client(struct ssh *ssh)
 	    kex->host_authentication_challenge = malloc(ML_KEM_AUTH_SS_LENGTH);
 		u_char *ct;
 		size_t ct_len;
-	    sshkey_sign(kex->initial_hostkey,
+	    if ((r = sshkey_sign(kex->initial_hostkey,
 					&ct, &ct_len,
 					kex->host_authentication_challenge, ML_KEM_AUTH_SS_LENGTH,
-					NULL, NULL, NULL, 0);
+					NULL, NULL, NULL, 0)) != 0) {
+					fatal_fr(r, "Failed creating host challenge string");
+		}
+		debug_f("ct_len: %d", ct_len);
         if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
        	    (r = sshpkt_put_stringb(ssh, kex->client_pub)) != 0 ||
        	    (r = sshpkt_put_string(ssh, ct, ct_len)) != 0 ||
@@ -395,6 +398,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	/* sign H */
+	debug_f("kex->host_challenge_length: %d", kex->host_challenge_len);
 	debug_f("'signing' hash");
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
 	    debug_f("allocating signature buffer");

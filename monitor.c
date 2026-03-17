@@ -738,7 +738,9 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	 * it's not trivial, since what is signed is the hash, rather
 	 * than the full kex structure...
 	 */
-	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64) {
+	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64
+	        && datlen != 768 && datlen != 1088 && datlen != 1568) {
+		//  Final 3 data lengths are for ML-KEM-AUTH hostkey CT length
 		/*
 		 * Construct expected hostkey proof and compare it to what
 		 * the client sent us.
@@ -772,8 +774,12 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	if ((key = get_hostkey_by_index(keyid)) != NULL) {
         switch (key->type) {
             case KEY_ML_KEM_AUTH:
-                if ((r = sshkey_verify(key, p, datlen, signature, siglen, alg, compat, NULL)) != 0)
-                    fatal_fr(r, "sign");
+                signature = malloc(ML_KEM_AUTH_SS_LENGTH);
+                siglen = ML_KEM_AUTH_SS_LENGTH;
+                if ((r = sshkey_verify(key, p, datlen, signature, siglen, alg, compat, NULL)) != 0) {
+                    free(signature);
+                    fatal_fr(r, "verify");
+                }
                 break;
             default:
                 if ((r = sshkey_sign(key, &signature, &siglen, p, datlen, alg,

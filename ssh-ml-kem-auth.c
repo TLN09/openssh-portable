@@ -41,11 +41,11 @@ ssh_ml_kem_auth_size(
     if (key->pkey == NULL) {
         return SSH_ERR_INVALID_ARGUMENT;
     }
-    
+
     return EVP_PKEY_get_security_category(key->pkey);
 }
 
-int 
+int
 ssh_ml_kem_auth_alloc(
     struct sshkey *key
 ) {
@@ -76,7 +76,7 @@ ssh_ml_kem_auth_equal(
 int
 ssh_ml_kem_auth_serialize_public(
     const struct sshkey *key,
-    struct sshbuf *buffer, 
+    struct sshbuf *buffer,
     enum sshkey_serialize_rep options
 ) {
     int r = SSH_ERR_INTERNAL_ERROR;
@@ -86,12 +86,12 @@ ssh_ml_kem_auth_serialize_public(
 
     uint8_t *pub = NULL;
     size_t pub_len;
-    
+
     if (!EVP_PKEY_get_raw_public_key(key->pkey, pub, &pub_len)) {
         fprintf(stderr, "failed getting size of public key buffer\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
-    
+
     pub = malloc(pub_len);
     if (!EVP_PKEY_get_raw_public_key(key->pkey, pub, &pub_len)) {
         fprintf(stderr, "failed getting public key data\n");
@@ -100,7 +100,7 @@ ssh_ml_kem_auth_serialize_public(
     }
 
     if ((r = sshbuf_put_string(buffer, pub, pub_len)) != 0) {
-        fprintf(stderr, "failed putting key data into sshbuf\n");  
+        fprintf(stderr, "failed putting key data into sshbuf\n");
         goto out;
     }
 
@@ -114,8 +114,8 @@ ssh_ml_kem_auth_serialize_public(
 
 int
 ssh_ml_kem_auth_deserialize_public(
-    const char *key_type, 
-    struct sshbuf *buffer, 
+    const char *key_type,
+    struct sshbuf *buffer,
     struct sshkey *key
 ) {
     uint8_t *pub;
@@ -123,7 +123,7 @@ ssh_ml_kem_auth_deserialize_public(
     u_int32_t length;
     EVP_PKEY *new = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
-    
+
     // Read fist 4 bytes as the key length and use that to check keytype, create pub buffer, etc.
     if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
         fprintf(stderr, "failed getting public key length\n");
@@ -132,7 +132,7 @@ ssh_ml_kem_auth_deserialize_public(
 
     pub_len = (size_t)length;
     pub = malloc(pub_len);
-    
+
     // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
     // sshbuf_put_string works fine, so it is kind of weird
     const u_char *p = sshbuf_ptr(buffer);
@@ -179,13 +179,13 @@ ssh_ml_kem_auth_serialize_private(
     int r = SSH_ERR_INTERNAL_ERROR;
     uint8_t *private = NULL;
     size_t priv_len;
-    
+
     // If the buffer priv is NULL then *len is populated with the number of bytes required to hold the key
     if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
         fprintf(stderr, "failed getting private key length\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
-    
+
     private = malloc(priv_len);
     if (!EVP_PKEY_get_raw_private_key(key->pkey, private, &priv_len)) {
         fprintf(stderr, "failed getting pricate key data\n");
@@ -207,8 +207,8 @@ ssh_ml_kem_auth_serialize_private(
 
 int
 ssh_ml_kem_auth_deserialize_private(
-    const char *key_type, 
-    struct sshbuf *buffer, 
+    const char *key_type,
+    struct sshbuf *buffer,
     struct sshkey *key
 ) {
     uint8_t *private;
@@ -237,15 +237,15 @@ ssh_ml_kem_auth_deserialize_private(
         case 1632:
             type = "ML-KEM-512";
             break;
-        
+
         case 2400:
             type = "ML-KEM-768";
             break;
-        
+
         case 3168:
             type = "ML-KEM-1024";
             break;
-        
+
         default: // Should never happen but just in case
             r = SSH_ERR_INTERNAL_ERROR;
             goto out;
@@ -260,7 +260,7 @@ ssh_ml_kem_auth_deserialize_private(
     // Success
     r = 0;
     key->pkey = new;
-  
+
   out:
     free(private);
     return r;
@@ -268,7 +268,7 @@ ssh_ml_kem_auth_deserialize_private(
 
 int
 ssh_ml_kem_auth_generate(
-    struct sshkey *key, 
+    struct sshkey *key,
     int bits
 ) {
     EVP_PKEY *res = NULL;
@@ -284,12 +284,12 @@ ssh_ml_kem_auth_generate(
         case 1024:
             key_type = "ML-KEM-1024";
             break;
-        
+
         default:
             return SSH_ERR_INVALID_ARGUMENT;
     }
-    
-    
+
+
     if ((res = EVP_PKEY_Q_keygen(NULL, NULL, key_type)) == NULL) {
 		// Failed key generation so return error
         fprintf(stderr, "failed to generate key pair\n");
@@ -310,13 +310,13 @@ ssh_ml_kem_auth_copy_public(
     size_t pub_len;
     char *type = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
-    
+
     // The required buffer size can be obtained from *out_len by calling the function with buf set to NULL
     if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", NULL, 0, &pub_len)) {
         fprintf(stderr, "failed getting public key size from key->pkey\n");
         return SSH_ERR_LIBCRYPTO_ERROR;
     }
-    
+
     pub = malloc(pub_len);
     // The required buffer size can be obtained from *out_len by calling the function with buf set to NULL
     if (!EVP_PKEY_get_octet_string_param(from->pkey, "pub", pub, pub_len, &pub_len)) {
@@ -361,10 +361,10 @@ ssh_ml_kem_auth_encapsulate(
     u_char **ct_ptr,
     size_t *lenp,
     const u_char *ss,
-    size_t ss_len, 
-    const char *alg, 
-    const char *sk_provider, 
-    const char *sk_pin, 
+    size_t ss_len,
+    const char *alg,
+    const char *sk_provider,
+    const char *sk_pin,
     u_int compat
 ) {
     size_t ct_len;
@@ -377,7 +377,7 @@ ssh_ml_kem_auth_encapsulate(
         fprintf(stderr, "shared secret is NULL!\n");
         return SSH_ERR_INVALID_ARGUMENT;
     }
-    
+
     if (lenp != NULL)
 		*lenp = 0;
 	if (ct_ptr != NULL)
@@ -388,7 +388,7 @@ ssh_ml_kem_auth_encapsulate(
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
-    
+
     if ((r = EVP_PKEY_encapsulate_init(encaps_ctx, NULL)) <= 0) {
         fprintf(stderr, "failed initializing encapsulation context\n");
         r = r == -2 ? SSH_ERR_SIGN_ALG_UNSUPPORTED : SSH_ERR_LIBCRYPTO_ERROR;
@@ -410,7 +410,7 @@ ssh_ml_kem_auth_encapsulate(
 
     fprintf(stderr, "kem_encapsulate: ct_len: %d\n", ct_len);
     ct = malloc(ct_len);
-    
+
     // Generate and encapsulate shared secret and save in ct and ss. Lengths are updated to reflect actual lengths.
     if ((r = EVP_PKEY_encapsulate(encaps_ctx, ct, &ct_len, ss, &ss_len)) <= 0) {
         fprintf(stderr, "failed when trying to encapsulate a shared secret\n");
@@ -418,7 +418,7 @@ ssh_ml_kem_auth_encapsulate(
         goto out;
     }
 
-    // From the documentation: 
+    // From the documentation:
     // >> If wrappedkey (ct here) is not NULL and the call is successful then the generated shared secret
     // >> is written to genkey (ss here) and its size is written to *genkeylen (which must be non-NULL).
     if (ct == NULL) {
@@ -451,11 +451,11 @@ ssh_ml_kem_auth_encapsulate(
 int
 ssh_ml_kem_auth_decapsulate(
     const struct sshkey *key,
-    const u_char *ct, 
+    const u_char *ct,
     size_t ct_len,
     u_char *ss,
     size_t ss_len,
-    const char *alg, 
+    const char *alg,
     u_int compat,
     struct sshkey_sig_details **detailsp
 ) {
@@ -465,11 +465,13 @@ ssh_ml_kem_auth_decapsulate(
 
     if (ct == NULL) {
         fprintf(stderr, "ciphertext is NULL!\n");
+        debug_f("ciphertext is NULL");
         return SSH_ERR_INVALID_ARGUMENT;
     }
-    
+
     if (ss == NULL) {
         fprintf(stderr, "shared secret is NULL!\n");
+        debug_f("shared secret is NULL");
         return SSH_ERR_INVALID_ARGUMENT;
     }
 
@@ -478,7 +480,7 @@ ssh_ml_kem_auth_decapsulate(
         r = SSH_ERR_LIBCRYPTO_ERROR;
         goto out;
     }
-    
+
     if ((r = EVP_PKEY_decapsulate_init(decaps_ctx, NULL)) <= 0) {
         fprintf(stderr, "failed initializing decapsulation context %d\n", r);
         r = r == -2 ? SSH_ERR_SIGN_ALG_UNSUPPORTED : SSH_ERR_LIBCRYPTO_ERROR;
@@ -494,10 +496,11 @@ ssh_ml_kem_auth_decapsulate(
 
     if (ossl_ss_len > ss_len) {
         fprintf(stderr, "shared secret buffer is not big enough");
+        debug_f("shared secret buffer is not big enough. ossl_ss_len: %d, ss_len: %d", ossl_ss_len, ss_len);
         r = SSH_ERR_INVALID_ARGUMENT;
         goto out;
     }
-    
+
     // Decapsulate ct into ss
     if ((r = EVP_PKEY_decapsulate(decaps_ctx, ss, &ss_len, ct, ct_len)) <= 0) {
         fprintf(stderr, "failed when trying to decapsulate a shared secret: %d\n", r);
