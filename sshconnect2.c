@@ -1746,6 +1746,7 @@ load_identity_file(Identity *id)
 static int
 key_type_allowed_by_config(struct sshkey *key)
 {
+    debug3_f("%s", options.pubkey_accepted_algos);
 	if (match_pattern_list(sshkey_ssh_name(key),
 	    options.pubkey_accepted_algos, 0) == 1)
 		return 1;
