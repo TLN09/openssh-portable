@@ -263,6 +263,10 @@ list_hostkey_types(void)
 			debug3_f("appending slh-dsa hostkey type");
 			append_hostkey_type(b, "ssh-slh-dsa");
 			break;
+		case KEY_ML_KEM_AUTH:
+			debug3_f("appending ml-kem-auth hostkey type");
+			append_hostkey_type(b, "ssh-ml-kem-auth");
+			break;
 		}
 		/* If the private key has a cert peer, then list that too */
 		key = host_certificates[i];
@@ -331,7 +335,12 @@ get_hostkey_public_by_type(int type, int nid, struct ssh *ssh)
 struct sshkey *
 get_hostkey_private_by_type(int type, int nid, struct ssh *ssh)
 {
-	return NULL;
+    struct sshkey *key = NULL;
+	if (type == KEY_ML_KEM_AUTH) {
+	    debug_f("THIS IS WHY IT IS NULL");
+	    // load private key
+	}
+	return key;
 }
 
 /* XXX remove */

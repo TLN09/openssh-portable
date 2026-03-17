@@ -187,6 +187,8 @@ struct kex {
 	u_char sntrup761_client_key[crypto_kem_sntrup761_SECRETKEYBYTES]; /* KEM */
 	u_char mlkem768_client_key[crypto_kem_mlkem768_SECRETKEYBYTES]; /* KEM */
 	struct sshbuf *client_pub;
+	u_char *host_authentication_challenge;
+	size_t host_challenge_len;
 };
 
 int	 kex_name_valid(const char *);

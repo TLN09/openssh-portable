@@ -1590,6 +1590,13 @@ sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
 }
 
 int
+sshkey_copy_public(const struct sshkey *from, struct sshkey *to)
+{
+    struct sshkey_impl *impl = sshkey_impl_from_key(from);
+    return impl->funcs->copy_public(from, to);
+
+}
+int
 sshkey_copy_public_sk(const struct sshkey *from, struct sshkey *to)
 {
 	/* Append security-key application string */
