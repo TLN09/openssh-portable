@@ -819,11 +819,14 @@ int
 sshd_hostkey_verify(struct ssh *ssh, struct sshkey *privkey,
     struct sshkey *pubkey, u_char *signature, size_t slenp,
     u_char *data, size_t dlen, const char *alg) {
+    debug_f("Entering");
     if (privkey) {
+        debug_f("using privkey");
         if (mm_sshkey_verify(privkey, signature, slenp,
         data, dlen, alg, ssh->compat, NULL) < 0)
             fatal_f("privkey verify failed");
     } else {
+        debug_f("using pubkey");
         if (mm_sshkey_verify(pubkey, signature, slenp,
         data, dlen, alg, ssh->compat, NULL) < 0)
             fatal_f("pubkey verify failed");
