@@ -409,15 +409,15 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		slen = ML_KEM_AUTH_SS_LENGTH;
 		if ((r = kex->sign(ssh, server_host_private, server_host_public,
 				&signature, &slen,
-				kex->host_authentication_challenge,
-				kex->host_challenge_len, kex->hostkey_alg)) != 0) {
+				hash, hashlen, kex->hostkey_alg,
+                kex->host_authentication_challenge, kex->host_challenge_len)) != 0) {
 			debug_f("Failed 'signing' hash");
 			goto out;
 		}
 		debug_f("'signed' hash");
 	} else {
     	if ((r = kex->sign(ssh, server_host_private, server_host_public,
-    	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) != 0)
+    	    &signature, &slen, hash, hashlen, kex->hostkey_alg, NULL, 0)) != 0)
     		goto out;
 	}
 

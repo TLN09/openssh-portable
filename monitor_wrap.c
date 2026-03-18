@@ -258,7 +258,7 @@ mm_choose_dh(int min, int nbits, int max)
 int
 mm_sshkey_sign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, const char *hostkey_alg,
-    const char *sk_provider, const char *sk_pin, u_int compat)
+    const char *sk_provider, const char *sk_pin, u_int compat, u_char *host_auth_chall, size_t host_auth_chall_len)
 {
 	struct sshbuf *m;
 	int r;
@@ -271,6 +271,12 @@ mm_sshkey_sign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
 	    (r = sshbuf_put_cstring(m, hostkey_alg)) != 0 ||
 	    (r = sshbuf_put_u32(m, compat)) != 0)
 		fatal_fr(r, "assemble");
+
+	if (key->type == KEY_ML_KEM_AUTH) {
+	    if ((r = sshbuf_put_string(m, host_auth_chall, host_auth_chall_len)) != 0) {
+			fatal_fr(r, "assemble");
+		}
+	}
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, m);
 

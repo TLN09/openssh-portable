@@ -707,9 +707,9 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *pubkey, *key;
 	struct sshbuf *sigbuf = NULL;
-	u_char *p = NULL, *signature = NULL;
+	u_char *p = NULL, *signature = NULL, *auth_challenge = NULL;
 	char *alg = NULL;
-	size_t datlen, siglen;
+	size_t datlen, siglen, auth_challenge_len;
 	int r, is_proof = 0, keyid;
 	u_int compat;
 	const char proof_req[] = "hostkeys-prove-00@openssh.com";
@@ -721,6 +721,12 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	    (r = sshbuf_get_cstring(m, &alg, NULL)) != 0 ||
 	    (r = sshbuf_get_u32(m, &compat)) != 0)
 		fatal_fr(r, "parse");
+
+	if (pubkey->type == KEY_ML_KEM_AUTH) {
+	    if ((r = sshbuf_get_string(m, &auth_challenge, &auth_challenge_len))) {
+			fatal_fr(r, "parse");
+		}
+	}
 
 	if ((keyid = get_hostkey_index(pubkey, 1, ssh)) == -1)
 		fatal_f("unknown hostkey");
@@ -738,9 +744,7 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
 	 * it's not trivial, since what is signed is the hash, rather
 	 * than the full kex structure...
 	 */
-	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64
-	        && datlen != 768 && datlen != 1088 && datlen != 1568) {
-		//  Final 3 data lengths are for ML-KEM-AUTH hostkey CT length
+	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64) {
 		/*
 		 * Construct expected hostkey proof and compare it to what
 		 * the client sent us.
@@ -776,7 +780,7 @@ mm_answer_sign(struct ssh *ssh, int sock, struct sshbuf *m)
             case KEY_ML_KEM_AUTH:
                 signature = malloc(ML_KEM_AUTH_SS_LENGTH);
                 siglen = ML_KEM_AUTH_SS_LENGTH;
-                if ((r = sshkey_verify(key, p, datlen, signature, siglen, alg, compat, NULL)) != 0) {
+                if ((r = sshkey_verify(key, auth_challenge, auth_challenge_len, signature, siglen, alg, compat, NULL)) != 0) {
                     free(signature);
                     fatal_fr(r, "verify");
                 }
@@ -1434,21 +1438,26 @@ monitor_valid_userblob(struct ssh *ssh, const u_char *data, u_int datalen)
 	free(cp);
 	if ((r = sshbuf_get_u8(b, &type)) != 0)
 		fatal_fr(r, "parse pktype");
+	debug_f("type: %d", type);
 	if (type == 0)
 		fail++;
 	if ((r = sshbuf_get_string(b, &pkalg, &pkalg_len)) != 0) {
 	    fatal_fr(r, "parse pkalg failed");
 	}
+	debug_f("pkalg: %s", pkalg);
 	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkblob */
 	    (hostbound && (r = sshkey_froms(b, &hostkey)) != 0))
 		fatal_fr(r, "parse pk");
 	if (sshkey_type_from_name(pkalg) == KEY_ML_KEM_AUTH) {
 	    if ((r = sshbuf_skip_string(b)) != 0) /* shared secret data from authctxt */ {
+			debug_f("This should not happen...");
 			fail++;
 		}
 	}
-	if (sshbuf_len(b) != 0)
-		fail++;
+	if (sshbuf_len(b) != 0) {
+		debug_f("buflen not zero");
+	    fail++;
+	}
 	sshbuf_free(b);
 	if (hostkey != NULL) {
 		/*

@@ -799,17 +799,17 @@ main(int ac, char **av)
 int
 sshd_hostkey_sign(struct ssh *ssh, struct sshkey *privkey,
     struct sshkey *pubkey, u_char **signature, size_t *slenp,
-    const u_char *data, size_t dlen, const char *alg)
+    const u_char *data, size_t dlen, const char *alg, u_char *host_auth_chall, size_t host_auth_chall_len)
 {
 	if (privkey) {
 		if (mm_sshkey_sign(ssh, privkey, signature, slenp,
 		    data, dlen, alg, options.sk_provider, NULL,
-		    ssh->compat) < 0)
+		    ssh->compat, host_auth_chall, host_auth_chall_len) < 0)
 			fatal_f("privkey sign failed");
 	} else {
 		if (mm_sshkey_sign(ssh, pubkey, signature, slenp,
 		    data, dlen, alg, options.sk_provider, NULL,
-		    ssh->compat) < 0)
+		    ssh->compat, host_auth_chall, host_auth_chall_len) < 0)
 			fatal_f("pubkey sign failed");
 	}
 	return 0;
@@ -862,7 +862,7 @@ do_ssh2_kex(struct ssh *ssh)
 	kex->load_host_public_key=&get_hostkey_public_by_type;
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
-	kex->sign = sshd_hostkey_sign;
+	kex->sign = &sshd_hostkey_sign;
 
 	ssh_dispatch_run_fatal(ssh, DISPATCH_BLOCK, &kex->done);
 	kex_proposal_free_entries(myproposal);

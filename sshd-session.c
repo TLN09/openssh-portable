@@ -63,7 +63,7 @@
 #include <sys/security.h>
 #include <prot.h>
 #endif
- 
+
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"
@@ -1242,7 +1242,7 @@ main(int ac, char **av)
 		timerclear(&itv.it_interval);
 		itv.it_value.tv_sec = options.login_grace_time;
 		itv.it_value.tv_sec += ujitter / 1000000;
-		itv.it_value.tv_usec = ujitter % 1000000; 
+		itv.it_value.tv_usec = ujitter % 1000000;
 
 		if (setitimer(ITIMER_REAL, &itv, NULL) == -1)
 			fatal("login grace time setitimer failed");
@@ -1355,17 +1355,17 @@ main(int ac, char **av)
 int
 sshd_hostkey_sign(struct ssh *ssh, struct sshkey *privkey,
     struct sshkey *pubkey, u_char **signature, size_t *slenp,
-    const u_char *data, size_t dlen, const char *alg)
+    const u_char *data, size_t dlen, const char *alg, u_char *host_auth_chall, size_t host_auth_chall_len)
 {
 	if (privkey) {
 		if (mm_sshkey_sign(ssh, privkey, signature, slenp,
 		    data, dlen, alg, options.sk_provider, NULL,
-		    ssh->compat) < 0)
+		    ssh->compat, host_auth_chall, host_auth_chall_len) < 0)
 			fatal_f("privkey sign failed");
 	} else {
 		if (mm_sshkey_sign(ssh, pubkey, signature, slenp,
 		    data, dlen, alg, options.sk_provider, NULL,
-		    ssh->compat) < 0)
+		    ssh->compat, host_auth_chall, host_auth_chall_len) < 0)
 			fatal_f("pubkey sign failed");
 	}
 	return 0;
