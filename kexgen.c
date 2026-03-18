@@ -140,6 +140,9 @@ kex_gen_client(struct ssh *ssh)
 					NULL, NULL, NULL, 0)) != 0) {
 					fatal_fr(r, "Failed creating host challenge string");
 		}
+		// Reset initial hostkey after it is no longer needed
+		// as KEM authentication key
+		kex->initial_hostkey = NULL;
 		debug_f("ct_len: %d", ct_len);
         if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
        	    (r = sshpkt_put_stringb(ssh, kex->client_pub)) != 0 ||
