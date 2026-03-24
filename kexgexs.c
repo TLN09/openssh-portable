@@ -181,7 +181,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* sign H */
 	if ((r = kex->sign(ssh, server_host_private, server_host_public,
-	    &signature, &slen, hash, hashlen, kex->hostkey_alg)) < 0)
+	    &signature, &slen, hash, hashlen, kex->hostkey_alg, NULL, 0)) < 0)
 		goto out;
 
 	/* send server hostkey, DH pubkey 'f' and signed H */
