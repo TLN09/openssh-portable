@@ -44,6 +44,7 @@
 
 static int input_kex_gen_init(int, u_int32_t, struct ssh *);
 static int input_kex_gen_reply(int type, u_int32_t seq, struct ssh *ssh);
+static int kex_host_auth_challenge_resp(int type, u_int32_t seq, struct ssh *ssh);
 
 static int
 kex_gen_hash(
@@ -191,10 +192,17 @@ input_kex_gen_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* Q_S, server public key */
 	/* signed H */
-	if ((r = sshpkt_getb_froms(ssh, &server_blob)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
-		goto out;
+	if (server_host_key->type == KEY_ML_KEM_AUTH) {
+        // Hostkey challenge response will be sent encrypted later
+	    if ((r = sshpkt_getb_froms(ssh, &server_blob)) != 0 ||
+    	    (r = sshpkt_get_end(ssh)) != 0)
+            goto out;
+	} else {
+    	if ((r = sshpkt_getb_froms(ssh, &server_blob)) != 0 ||
+    	    (r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
+    	    (r = sshpkt_get_end(ssh)) != 0)
+    		goto out;
+	}
 
 	/* compute shared secret */
 	switch (kex->kex_type) {
@@ -245,41 +253,42 @@ input_kex_gen_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 
 	if (server_host_key->type == KEY_ML_KEM_AUTH) {
-	    if (slen != ML_KEM_AUTH_SS_LENGTH) {
-			r = SSH_ERR_SIGNATURE_INVALID;
-			goto out;
-		}
-	    int valid = 1;
-		for (int i = 0; valid && i < ML_KEM_AUTH_SS_LENGTH; i++) {
-			valid &= signature[i] == kex->host_authentication_challenge[i];
-		}
-		if (!valid) {
-		    r = SSH_ERR_SIGNATURE_INVALID;
-			goto out;
-		}
+		// Derive keys and wait to recieve host auth challenge response message
+		// to finish host authentication
+		if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0)
+		    goto out;
+
+		ssh_dispatch_set(ssh, SSH2_MSG_KEX_ML_KEM_AUTH_HOST, &kex_host_auth_challenge_resp);
 	} else {
     	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
     	    kex->hostkey_alg, ssh->compat, NULL)) != 0) {
     		goto out;
     	}
+    	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
+    	    (r = kex_send_newkeys(ssh)) != 0)
+    		goto out;
+
+        /* save initial signature */
+        if ((kex->flags & KEX_INITIAL) != 0) {
+            if (kex->initial_sig != NULL) {
+                r = SSH_ERR_INTERNAL_ERROR;
+                goto out;
+            }
+            if ((kex->initial_sig = sshbuf_new()) == NULL) {
+    			r = SSH_ERR_ALLOC_FAIL;
+    			goto out;
+    		}
+    		if ((r = sshbuf_put(kex->initial_sig, signature, slen)) != 0)
+    			goto out;
+        }
 	}
 
-	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
-	    (r = kex_send_newkeys(ssh)) != 0)
-		goto out;
-
-	/* save initial signature and hostkey */
+	/* save hostkey */
 	if ((kex->flags & KEX_INITIAL) != 0) {
-		if (kex->initial_hostkey != NULL || kex->initial_sig != NULL) {
+		if (kex->initial_hostkey != NULL) {
 			r = SSH_ERR_INTERNAL_ERROR;
 			goto out;
 		}
-		if ((kex->initial_sig = sshbuf_new()) == NULL) {
-			r = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		if ((r = sshbuf_put(kex->initial_sig, signature, slen)) != 0)
-			goto out;
 		kex->initial_hostkey = server_host_key;
 		server_host_key = NULL;
 	}
@@ -300,6 +309,53 @@ out:
 	sshbuf_free(kex->client_pub);
 	kex->client_pub = NULL;
 	return r;
+}
+
+static int
+kex_host_auth_challenge_resp(int type, u_int32_t seq, struct ssh *ssh) {
+    int valid, r = SSH_ERR_INTERNAL_ERROR;
+    u_char *host_challenge_resp = NULL;
+    size_t host_challenge_resp_len;
+    struct kex *kex = ssh->kex;
+
+    if ((r = sshpkt_get_string(ssh, &host_challenge_resp, &host_challenge_resp_len)) != 0 ||
+        (r = sshpkt_get_end(ssh)) != 0)
+        goto out;
+
+    if (host_challenge_resp_len != ML_KEM_AUTH_SS_LENGTH) {
+		r = SSH_ERR_SIGNATURE_INVALID;
+		goto out;
+	}
+    valid = 1;
+	for (int i = 0; valid && i < ML_KEM_AUTH_SS_LENGTH; i++) {
+		valid &= host_challenge_resp[i] == kex->host_authentication_challenge[i];
+	}
+	if (!valid) {
+	    r = SSH_ERR_SIGNATURE_INVALID;
+		goto out;
+	}
+
+    /* host is authenticated */
+    if ((r = kex_send_newkeys(ssh)) != 0)
+        goto out;
+
+    /* save initial host authentication challenge */
+    if ((kex->flags & KEX_INITIAL) != 0) {
+        if (kex->initial_sig != NULL) {
+            r = SSH_ERR_INTERNAL_ERROR;
+            goto out;
+        }
+        if ((kex->initial_sig = sshbuf_new()) == NULL) {
+			r = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+		if ((r = sshbuf_put(kex->initial_sig, host_challenge_resp, host_challenge_resp_len)) != 0)
+			goto out;
+    }
+
+  out:
+    free(host_challenge_resp);
+    return r;
 }
 
 int
@@ -422,18 +478,38 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* send server hostkey, ECDH pubkey 'Q_S' and signed H */
-	debug_f("sending hostkey and 'signature'");
+	debug_f("sending hostkey and signature");
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_REPLY)) != 0 ||
 	    (r = sshpkt_put_stringb(ssh, server_host_key_blob)) != 0 ||
-	    (r = sshpkt_put_stringb(ssh, server_pubkey)) != 0 ||
-	    (r = sshpkt_put_string(ssh, signature, slen)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
+	    (r = sshpkt_put_stringb(ssh, server_pubkey)) != 0)
 		goto out;
 
+	if (server_host_public->type == KEY_ML_KEM_AUTH) {
+	    // Don't send hostkey challenge response unencrypted
+	    if ((r = sshpkt_send(ssh)) != 0)
+			goto out;
+	} else {
+	    if ((r = sshpkt_put_string(ssh, signature, slen)) != 0 ||
+			(r = sshpkt_send(ssh)) != 0)
+			goto out;
+	}
+
 	debug_f("deriving keys");
-	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
-	    (r = kex_send_newkeys(ssh)) != 0)
-		goto out;
+	if (server_host_public->type == KEY_ML_KEM_AUTH) {
+        // Don't send newkeys message before host authentication is done
+	    if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0)
+            goto out;
+
+		// Send auth challenge in encrypted packet
+		if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ML_KEM_AUTH_HOST)) != 0 ||
+		    (r = sshpkt_put_string(ssh, signature, slen)) != 0 ||
+			(r = sshpkt_send(ssh)) != 0)
+		    goto out;
+	} else {
+    	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
+    	    (r = kex_send_newkeys(ssh)) != 0)
+    		goto out;
+	}
 	/* retain copy of hostkey used at initial KEX */
 	if (kex->initial_hostkey == NULL &&
 	    (r = sshkey_from_private(server_host_public,
