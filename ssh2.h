@@ -109,6 +109,8 @@
 #define SSH2_MSG_KEX_ECDH_INIT				30
 #define SSH2_MSG_KEX_ECDH_REPLY				31
 
+#define SSH2_MSG_KEX_ML_KEM_AUTH_HOST       32
+
 /* transport layer: OpenSSH extensions */
 #define SSH2_MSG_PING					192
 #define SSH2_MSG_PONG					193
