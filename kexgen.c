@@ -496,7 +496,7 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	debug_f("deriving keys");
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
-        // Don't send newkeys message before host authentication is done
+        // Don't send newkeys message before host authentication string has been sent
 	    if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0)
             goto out;
 
@@ -504,6 +504,9 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 		if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ML_KEM_AUTH_HOST)) != 0 ||
 		    (r = sshpkt_put_string(ssh, signature, slen)) != 0 ||
 			(r = sshpkt_send(ssh)) != 0)
+		    goto out;
+
+		if ((r = kex_send_newkeys(ssh)) != 0)
 		    goto out;
 	} else {
     	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
