@@ -255,8 +255,8 @@ input_kex_gen_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if (server_host_key->type == KEY_ML_KEM_AUTH) {
 		// Derive keys and wait to recieve host auth challenge response message
 		// to finish host authentication
-		if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0)
-		    goto out;
+		if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
+    	    (r = kex_send_newkeys(ssh)) != 0)
 
 		ssh_dispatch_set(ssh, SSH2_MSG_KEX_ML_KEM_AUTH_HOST, &kex_host_auth_challenge_resp);
 	} else {
@@ -318,14 +318,18 @@ kex_host_auth_challenge_resp(int type, u_int32_t seq, struct ssh *ssh) {
     size_t host_challenge_resp_len;
     struct kex *kex = ssh->kex;
 
+    debug_f("Getting host challenge response");
     if ((r = sshpkt_get_string(ssh, &host_challenge_resp, &host_challenge_resp_len)) != 0 ||
         (r = sshpkt_get_end(ssh)) != 0)
         goto out;
 
+    debug_f("Checking if it is correct length");
     if (host_challenge_resp_len != ML_KEM_AUTH_SS_LENGTH) {
 		r = SSH_ERR_SIGNATURE_INVALID;
 		goto out;
 	}
+
+    debug_f("Checking if it is valid");
     valid = 1;
 	for (int i = 0; valid && i < ML_KEM_AUTH_SS_LENGTH; i++) {
 		valid &= host_challenge_resp[i] == kex->host_authentication_challenge[i];
@@ -335,10 +339,7 @@ kex_host_auth_challenge_resp(int type, u_int32_t seq, struct ssh *ssh) {
 		goto out;
 	}
 
-    /* host is authenticated */
-    if ((r = kex_send_newkeys(ssh)) != 0)
-        goto out;
-
+    debug_f("Saving initial auth challenge");
     /* save initial host authentication challenge */
     if ((kex->flags & KEX_INITIAL) != 0) {
         if (kex->initial_sig != NULL) {
@@ -496,9 +497,9 @@ input_kex_gen_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	debug_f("deriving keys");
 	if (server_host_public->type == KEY_ML_KEM_AUTH) {
-        // Don't send newkeys message before host authentication is done
-	    if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0)
-            goto out;
+        if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) != 0 ||
+       	    (r = kex_send_newkeys(ssh)) != 0)
+       		goto out;
 
 		// Send auth challenge in encrypted packet
 		if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ML_KEM_AUTH_HOST)) != 0 ||
