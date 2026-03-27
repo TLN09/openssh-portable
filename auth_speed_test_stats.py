@@ -17,7 +17,7 @@ def parse_results(data: str) -> list[float]:
 
 
 def calculate_stats(
-    data: list[float], test_type: str, key_type: str, include_header: bool
+    data: list[float], test_type: str, key_type: str, include_header: bool, count: int
 ) -> None:
     data.sort()
     minimum = data[0]
@@ -30,16 +30,16 @@ def calculate_stats(
         print("key,testtype,min,max,median,mean,variance,std. dev.")
 
     print(
-        f"{key_type},{test_type},{minimum},{maximum},{median},{mean},{variance},{std_deviation}"
+        f"{key_type},{test_type},{minimum},{maximum},{median},{mean},{variance},{std_deviation},{count}"
     )
 
 
-def main(results: str, test_type: str, key_type: str, include_header: bool):
+def main(results: str, test_type: str, key_type: str, include_header: bool, count: int):
     with open(results, "r", encoding="utf-8") as f:
         data = f.read()
 
     data = parse_results(data)
-    calculate_stats(data, test_type, key_type, include_header)
+    calculate_stats(data, test_type, key_type, include_header, count)
 
 
 if __name__ == "__main__":
@@ -65,6 +65,12 @@ if __name__ == "__main__":
         action="store_true",
         required=False,
     )
+    arg_parser.add_argument(
+        "--count",
+        help="number of authentication tries used",
+        required=False,
+        type=int,
+    )
     args = arg_parser.parse_args()
 
-    main(args.results, args.test_type, args.key_type, args.include_header)
+    main(args.results, args.test_type, args.key_type, args.include_header, args.count)
