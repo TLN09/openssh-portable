@@ -129,8 +129,6 @@
 #define SSH2_MSG_USERAUTH_INFO_REQUEST			60
 #define SSH2_MSG_USERAUTH_INFO_RESPONSE			61
 
-#define SSH2_MSG_KEX_ML_KEM_AUTH_HOST       62
-
 /* connection protocol: generic */
 
 #define SSH2_MSG_GLOBAL_REQUEST				80
