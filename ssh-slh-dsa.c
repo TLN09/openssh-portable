@@ -110,19 +110,11 @@ ssh_slh_dsa_deserialize_public(
     size_t length_method_name;
     size_t length_public_key;
     char *method_name;
-    const u_char *buf_ptr;
     int r = SSH_ERR_INTERNAL_ERROR;
 
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting method name length\n");
-        return r;
+    if ((r = sshbuf_get_string(buffer, &method_name, &length_method_name)) != 0) {
+        goto out;
     }
-
-    length_method_name = (size_t)length;
-    method_name = malloc(length_method_name);
-    buf_ptr = sshbuf_ptr(buffer);
-    memcpy(method_name, buf_ptr, length_method_name);
-    sshbuf_consume(buffer, length_method_name); // Tell the buffer you have read its contents
 
     if ((key->oqs_sig = OQS_SIG_new(method_name)) == NULL) {
         fprintf(stderr, "failed allocating oqs_sig\n");
@@ -130,26 +122,9 @@ ssh_slh_dsa_deserialize_public(
         goto out;
     }
 
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting public key length\n");
+    if ((r = sshbuf_get_string(buffer, &key->slh_dsa_pk, &length_public_key)) != 0) {
         goto out;
     }
-
-    length_public_key = (size_t)length;
-    if (length_public_key != key->oqs_sig->length_public_key) {
-        fprintf(stderr, "public key length mismatch\n");
-        r = SSH_ERR_INVALID_FORMAT;
-        goto out;
-    }
-
-    if ((key->slh_dsa_pk = OQS_MEM_malloc(length_public_key)) == NULL) {
-        fprintf(stderr, "failed allocating key->slh_dsa_pk\n");
-        r = SSH_ERR_ALLOC_FAIL;
-        goto out;
-    }
-    buf_ptr = sshbuf_ptr(buffer);
-    memcpy(key->slh_dsa_pk, buf_ptr, length_public_key);
-    sshbuf_consume(buffer, length_public_key); // Tell the buffer you have read its contents
 
 
     // Success
@@ -158,7 +133,6 @@ ssh_slh_dsa_deserialize_public(
   out:
     free(method_name);
     if (r != 0) {
-        OQS_MEM_insecure_free(key->slh_dsa_pk);
         if (key->oqs_sig != NULL) {
             // Documentation does not say it can be called on a null pointer
             // Better safe than sorry
@@ -210,16 +184,9 @@ ssh_slh_dsa_deserialize_private(
     const u_char *buf_ptr;
     int r = SSH_ERR_INTERNAL_ERROR;
 
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting method name length\n");
-        return r;
+    if ((r = sshbuf_get_string(buffer, &method_name, &length_method_name)) != 0) {
+        goto out;
     }
-
-    length_method_name = (size_t)length;
-    method_name = malloc(length_method_name);
-    buf_ptr = sshbuf_ptr(buffer);
-    memcpy(method_name, buf_ptr, length_method_name);
-    sshbuf_consume(buffer, length_method_name); // Tell the buffer you have read its contents
 
     if ((key->oqs_sig = OQS_SIG_new(method_name)) == NULL) {
         fprintf(stderr, "failed allocating oqs_sig\n");
@@ -227,48 +194,13 @@ ssh_slh_dsa_deserialize_private(
         goto out;
     }
 
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting secret key length\n");
+    if ((r = sshbuf_get_string(buffer, &key->slh_dsa_sk, &length_secret_key)) != 0) {
         goto out;
     }
 
-    length_secret_key = (size_t)length;
-    if (length_secret_key != key->oqs_sig->length_secret_key) {
-        fprintf(stderr, "secret key length mismatch\n");
-        r = SSH_ERR_INVALID_FORMAT;
+    if ((r = sshbuf_get_string(buffer, &key->slh_dsa_pk, &length_public_key)) != 0) {
         goto out;
     }
-
-    if ((key->slh_dsa_sk = OQS_MEM_malloc(length_secret_key)) == NULL) {
-        fprintf(stderr, "failed allocating key->slh_dsa_sk\n");
-        r = SSH_ERR_ALLOC_FAIL;
-        goto out;
-    }
-    buf_ptr = sshbuf_ptr(buffer);
-    memcpy(key->slh_dsa_sk, buf_ptr, length_secret_key);
-    sshbuf_consume(buffer, length_secret_key); // Tell the buffer you have read its contents
-
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting public key length\n");
-        goto out;
-    }
-
-    length_public_key = (size_t)length;
-    if (length_public_key != key->oqs_sig->length_public_key) {
-        fprintf(stderr, "private_deserialize: public key length mismatch: %d != %d\n", length_public_key, key->oqs_sig->length_public_key);
-        r = SSH_ERR_INVALID_FORMAT;
-        goto out;
-    }
-
-    if ((key->slh_dsa_pk = OQS_MEM_malloc(length_public_key)) == NULL) {
-        fprintf(stderr, "failed allocating key->slh_dsa_pk during private deserialization\n");
-        r = SSH_ERR_ALLOC_FAIL;
-        goto out;
-    }
-    buf_ptr = sshbuf_ptr(buffer);
-    memcpy(key->slh_dsa_pk, buf_ptr, length_public_key);
-    sshbuf_consume(buffer, length_public_key); // Tell the buffer you have read its contents
-
 
     // Success
     r = 0;

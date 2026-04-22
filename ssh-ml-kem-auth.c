@@ -124,20 +124,9 @@ ssh_ml_kem_auth_deserialize_public(
     EVP_PKEY *new = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
 
-    // Read fist 4 bytes as the key length and use that to check keytype, create pub buffer, etc.
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting public key length\n");
-        return r;
+    if ((r = sshbuf_get_string(buffer, &pub, &pub_len)) != 0) {
+        goto out;
     }
-
-    pub_len = (size_t)length;
-    pub = malloc(pub_len);
-
-    // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
-    // sshbuf_put_string works fine, so it is kind of weird
-    const u_char *p = sshbuf_ptr(buffer);
-    memcpy(pub, p, pub_len);
-    sshbuf_consume(buffer, pub_len); // Tell the buffer you have read its contents
 
     char *type = NULL;
     switch (pub_len) { // Key lengths from FIPS 203 document
@@ -217,20 +206,9 @@ ssh_ml_kem_auth_deserialize_private(
     EVP_PKEY *new = NULL;
     int r = SSH_ERR_INTERNAL_ERROR;
 
-    // Read fist 4 bytes as the key length and use that to check keytype, create pub buffer, etc.
-    if ((r = sshbuf_get_u32(buffer, &length)) != 0) {
-        fprintf(stderr, "failed getting private key length\n");
-        return r;
+    if ((r = sshbuf_get_string(buffer, &private, &private_len)) != 0) {
+        goto out;
     }
-
-    private_len = (size_t)length;
-    private = malloc(private_len);
-
-    // sshbuf_get_string does not properly get the value from the buffer so this is a little hack to make it work.
-    // sshbuf_put_string works fine, so it is kind of weird
-    const u_char *p = sshbuf_ptr(buffer);
-    memcpy(private, p, private_len);
-    sshbuf_consume(buffer, private_len); // Tell the buffer you have read its contents
 
     char *type = NULL;
     switch (private_len) { // Key lengths from FIPS 204 standard document
