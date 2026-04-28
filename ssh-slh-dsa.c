@@ -149,19 +149,11 @@ ssh_slh_dsa_serialize_private(
     enum sshkey_serialize_rep options
 ) {
     int r = SSH_ERR_INTERNAL_ERROR;
-    if ((r = sshbuf_put_string(buffer, key->oqs_sig->method_name, strlen(key->oqs_sig->method_name) + 1)) != 0) {
-        fprintf(stderr, "failed putting method name into sshbuf\n");
+    if ((r = ssh_slh_dsa_serialize_public(key, buffer, options)) != 0) {
         return r;
     }
 
     if ((r = sshbuf_put_string(buffer, key->slh_dsa_sk, key->oqs_sig->length_secret_key)) != 0) {
-        fprintf(stderr, "failed putting secret key data into sshbuf\n");
-        return r;
-    }
-
-    // hack to allow for private keys to also know the public key.
-    // Used to check it is the correct key when loading them during authentication
-    if ((r = sshbuf_put_string(buffer, key->slh_dsa_pk, key->oqs_sig->length_public_key)) != 0) {
         fprintf(stderr, "failed putting public key data into sshbuf\n");
         return r;
     }
@@ -176,21 +168,10 @@ ssh_slh_dsa_deserialize_private(
     struct sshbuf *buffer,
     struct sshkey *key
 ) {
-    u_int32_t length;
-    size_t length_method_name;
     size_t length_secret_key;
-    size_t length_public_key;
-    char *method_name;
-    const u_char *buf_ptr;
     int r = SSH_ERR_INTERNAL_ERROR;
 
-    if ((r = sshbuf_get_string(buffer, &method_name, &length_method_name)) != 0) {
-        goto out;
-    }
-
-    if ((key->oqs_sig = OQS_SIG_new(method_name)) == NULL) {
-        fprintf(stderr, "failed allocating oqs_sig\n");
-        r = SSH_ERR_LIBCRYPTO_ERROR;
+    if ((r = ssh_slh_dsa_deserialize_public(key_type, buffer, key)) != 0) {
         goto out;
     }
 
@@ -198,15 +179,10 @@ ssh_slh_dsa_deserialize_private(
         goto out;
     }
 
-    if ((r = sshbuf_get_string(buffer, &key->slh_dsa_pk, &length_public_key)) != 0) {
-        goto out;
-    }
-
     // Success
     r = 0;
 
   out:
-    free(method_name);
     if (r != 0) {
         OQS_MEM_insecure_free(key->slh_dsa_pk);
         if (key->oqs_sig != NULL) {
