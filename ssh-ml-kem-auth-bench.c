@@ -1,0 +1,585 @@
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "ssh-ml-kem-auth.h"
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifndef ITERATIONS
+#define ITERATIONS (10000)
+#endif
+
+/* C99 types */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L /* The compiler supports C99 */
+#define SIZE_T_FMT "z"
+#define SIZE_T_FMT_TYPE size_t
+#define LONGLONG long long
+#define LONGDOUBLE long double
+#define LONGDOUBLE_FMT "L"
+#elif defined(_MSC_VER) /* Some MSVC versions don't fully support C99 */
+#define SIZE_T_FMT "I"
+#define SIZE_T_FMT_TYPE size_t
+#define LONGLONG __int64
+#if _MSC_VER >= 1310
+#define LONGDOUBLE long double
+#define LONGDOUBLE_FMT "L"
+#else
+#define LONGDOUBLE double
+#define LONGDOUBLE_FMT ""
+#endif
+#else
+#define SIZE_T_FMT "l" /* Old compiler, use long */
+#define SIZE_T_FMT_TYPE long
+#if defined(__GNUC__) /* GCC supports long long as an extension */
+#define LONGLONG long long
+#else
+#define LONGLONG long
+#define __extension__ /* */
+#endif
+#define LONGDOUBLE double
+#define powl pow
+#define sqrtl sqrt
+#define LONGDOUBLE_FMT ""
+#endif
+/* End C99 types */
+
+/* Compatibility */
+#if !defined(__has_attribute) /* Clang & newer GCC */
+#define __has_attribute(x) 0
+#endif /* !defined(__has_attribute) */
+
+#if !defined(__has_builtin) /* Clang */
+#define __has_builtin(x) 0
+#endif /* !defined(__has_builtin) */
+
+#if !defined(INFINITY)
+#define INFINITY ((double) 1.0e120)
+#endif
+
+#if defined(_MSC_VER) /* MSVC-specific */
+#define NOINLINE __declspec(noinline) /* MSVC extension */
+#elif __has_attribute(__noinline__) || (defined(__GNUC__) && (__GNUC__ > 3) || (__GNUC__ == 3 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 1))
+#define NOINLINE __attribute__ ((noinline)) /* GNU extension */
+#else
+#define NOINLINE /* not supported */
+#endif /* defined(_MSC_VER) */
+
+#if __has_builtin(__builtin_expect) || (defined(__GNUC__) && (__GNUC__ > 3) || (__GNUC__ == 3 && defined(__GNUC_MINOR__) && __GNUC_MINOR__ >= 1))
+#define likely(x) __builtin_expect((x),1) /* GNU extension */
+#else
+#define likely(x) x
+#endif /* __has_builtin(__builtin_expect) */
+
+#if defined(_MSC_VER) /* MSVC inline assembler */
+#if !defined(intel) /* Use LFENCE for Intel processors and MFENCE for other manufacturers */
+#define xFENCE __asm _emit 0x0f __asm _emit 0xae __asm _emit 0xf0 /* MFENCE */
+#else
+#define xFENCE __asm _emit 0x0f __asm _emit 0xae __asm _emit 0xe8 /* LFENCE */
+#endif
+#define RDTSC rdtsc
+#define RDTSCP rdtscp
+
+#define WARMUP_MEASUREMENT() __asm { \
+        xFENCE \
+       __asm RDTSC \
+        xFENCE \
+        __asm RDTSC \
+        xFENCE \
+        __asm RDTSC \
+        xFENCE \
+}
+
+#define START_MEASUREMENT(HI, LO) __asm { \
+        xFENCE \
+        __asm RDTSC \
+        __asm mov LO,eax \
+        __asm mov HI,edx \
+}
+
+#define END_MEASUREMENT(HI, LO) __asm { \
+        __asm RDTSCP \
+        xFENCE \
+        __asm mov LO,eax \
+        __asm mov HI,edx \
+}
+
+#define ZERO_REGISTER(OUT) __asm mov OUT,0
+#elif defined(__GNUC__) /* GCC-style extended asm */
+#if !defined(intel) /* Use LFENCE for Intel processors and MFENCE for other manufacturers */
+#define xFENCE ".byte 0x0f, 0xae, 0xf0\n" /* MFENCE */
+#else
+#define xFENCE ".byte 0x0f, 0xae, 0xe8\n" /* LFENCE */
+#endif
+#define RDTSC ".byte 0x0f, 0x31\n"        /* RDTSC */
+#define RDTSCP ".byte 0x0f, 0x01, 0xf9\n" /* RDTSCP */
+
+#define WARMUP_MEASUREMENT() __asm__ volatile ( \
+        xFENCE \
+        RDTSC \
+        xFENCE \
+        RDTSC \
+        xFENCE \
+        RDTSC \
+        xFENCE \
+        : : : "%eax", "%edx", "memory" \
+)
+
+#define START_MEASUREMENT(HI, LO) __asm__ volatile ( \
+        xFENCE \
+        RDTSC \
+        : "=d" (HI), "=a" (LO) : : "memory" \
+)
+
+#define END_MEASUREMENT(HI, LO) __asm__ volatile ( \
+        RDTSCP \
+        xFENCE \
+        : "=d" (HI), "=a" (LO) : : "%ecx", "memory" \
+)
+#define ZERO_REGISTER(OUT) __asm__ volatile ("xor %0, %0" : "=r"(OUT) : : )
+#else /* Unsupported compiler. */
+#define WARMUP_MEASUREMENT() /* */
+#define START_MEASUREMENT(HI, LO) HI = 0; LO = 0
+#define END_MEASUREMENT(HI, LO) HI = 0; LO = 0
+#define ZERO_REGISTER(OUT) OUT = 0
+#endif /* defined(_MSC_VER) */
+
+/* End Compatibility */
+
+typedef unsigned LONGLONG u64;
+typedef unsigned long u32;
+
+/* Function signatures */
+NOINLINE static int do_nothing(void);
+NOINLINE static int key_generation(struct sshkey *, int);
+NOINLINE static int key_serialization_private(struct sshkey *, struct sshbuf *, enum sshkey_serialize_rep);
+NOINLINE static int key_serialization_public(struct sshkey *, struct sshbuf *, enum sshkey_serialize_rep);
+NOINLINE static int key_deserialization_private(struct sshkey *, struct sshbuf *);
+NOINLINE static int key_deserialization_public(struct sshkey *, struct sshbuf *);
+NOINLINE static int signing(struct sshkey *key, u_char **sigp, size_t *lenp, u_char *data, size_t datalen);
+NOINLINE static int verification(const struct sshkey *key, const u_char *ct, size_t ctlen, const u_char *ss, u_char *ssprime, size_t datalen); 
+void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const min, LONGDOUBLE * const max, LONGDOUBLE * const mean, LONGDOUBLE * const median, LONGDOUBLE * const variance);
+/* End function signatures */
+
+int do_nothing() {
+    int r;
+
+    ZERO_REGISTER(r);
+
+    return r;
+}
+
+int cmp(const void *a, const void *b) {
+    u64 x = *(u64 *)a;
+    u64 y = *(u64 *)b;
+    if (x > y) {
+        return 1;
+    }
+    
+    if (x == y) {
+        return 0;
+    }
+    
+    return -1;
+}
+
+void compute_statistics(u64 const data[], size_t const len, LONGDOUBLE * const min, LONGDOUBLE * const max, LONGDOUBLE * const mean, LONGDOUBLE * const median, LONGDOUBLE * const variance) {
+    LONGDOUBLE sum1 = 0.0L, sum2 = 0.0L, mean_, median_, variance_, min_ = (LONGDOUBLE)INFINITY, max_ = (LONGDOUBLE) -INFINITY;
+    size_t i;
+
+    qsort(data, len, sizeof(u64), &cmp);
+    
+    for (i = 0; i < len; i++) {
+        LONGDOUBLE const t = (LONGDOUBLE) data[i];
+        sum1 += t;
+        if (t > max_) max_ = t;
+        if (t < min_) min_ = t;
+    }
+
+    mean_ = sum1 / (LONGDOUBLE) len;
+    median_ = data[len/2];
+
+    for (i = 0; i < len; i++) {
+        sum2 += powl((LONGDOUBLE)data[i] - mean_, 2);
+    }
+
+    variance_ = sum2 / (((LONGDOUBLE)len) - 1.0L);
+
+    if (NULL != min) *min = min_;
+    if (NULL != max) *max = max_;
+    if (NULL != mean) *mean = mean_;
+    if (NULL != median) *median = median_;
+    if (NULL != variance) *variance = variance_;
+}
+
+int key_generation(struct sshkey *k, int bits) {
+    int r;
+    
+    r = ssh_ml_kem_auth_generate(k, bits);
+    
+    return r;
+}
+
+int benchmark_keygeneration(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Key Generation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_generation(key, bits);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_serialization_private(struct sshkey *k, struct sshbuf *buffer, enum sshkey_serialize_rep options) {
+    int r;
+    
+    r = ssh_ml_kem_auth_serialize_private(k, buffer, options);
+    
+    return r;
+}
+
+int benchmark_serialization_private(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Serialization Private", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_serialization_private(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_serialization_public(struct sshkey *k, struct sshbuf *buffer, enum sshkey_serialize_rep options) {
+    int r;
+    
+    r = ssh_ml_kem_auth_serialize_public(k, buffer, options);
+    
+    return r;
+}
+
+int benchmark_serialization_public(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Serialization Public", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_serialization_public(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_deserialization_private(struct sshkey *k, struct sshbuf *buffer) {
+    int r;
+    
+    r = ssh_ml_kem_auth_deserialize_private("ssh-ml-kem", buffer, k);
+    
+    return r;
+}
+
+int benchmark_deserialization_private(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Deserialization Private", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        key_serialization_private(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_deserialization_private(key, buffer);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int key_deserialization_public(struct sshkey *k, struct sshbuf *buffer) {
+    int r;
+    
+    r = ssh_ml_kem_auth_deserialize_public("ssh-ml-kem", buffer, k);
+    
+    return r;
+}
+
+int benchmark_deserialization_public(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Deserialization Public", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        struct sshbuf *buffer = sshbuf_new();
+        key_generation(key, bits);
+        key_serialization_public(key, buffer, SSHKEY_SERIALIZE_DEFAULT);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = key_deserialization_public(key, buffer);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+
+int signing(struct sshkey *key,
+    u_char **sigp,
+    size_t *lenp,
+    u_char *data,
+    size_t datalen
+) {
+    int r;
+
+    r = ssh_ml_kem_auth_encapsulate(key, sigp, lenp, data, datalen, NULL, NULL, NULL, 0);
+    
+    return r;
+}
+
+int benchmark_encapsulation(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Encapsulation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        ssh_ml_kem_auth_generate(key, bits);
+        u_char *ss = malloc(ML_KEM_AUTH_SS_LENGTH);
+        u_char *ct = NULL;
+        size_t ctlen = 0;
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = signing(key, &ct, &ctlen, ss, ML_KEM_AUTH_SS_LENGTH);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+        free(ss);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int verification(
+    const struct sshkey *key,
+    const u_char *ct, 
+    size_t ctlen,
+    const u_char *ss,
+    u_char *ssprime, 
+    size_t sslen
+) {
+    int r;
+    
+    r = ssh_ml_kem_auth_decapsulate(key, ct, ctlen, ssprime, sslen, NULL, 0, NULL);
+    for (int i = 0; r && i < sslen; i++) {
+        r = r && ss[i] == ssprime[i];
+    }
+    return r;
+}
+
+int benchmark_verification(int bits, u64 *deltas) {
+    int ret = 0;
+    size_t j, k;
+    LONGDOUBLE min, max, mean, variance, median;
+    u64 start, end;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+
+    char *type;
+    asprintf(&type, "ML-KEM-AUTH-%d Decapsulation", bits);
+    for(j = 0, k = 0; j < ITERATIONS; j++) {
+        struct sshkey *key = sshkey_new(KEY_ML_DSA);
+        ssh_ml_kem_auth_generate(key, bits);
+        u_char *ss = malloc(ML_KEM_AUTH_SS_LENGTH);
+        u_char *ssprime = malloc(ML_KEM_AUTH_SS_LENGTH);
+        u_char *ct = NULL;
+        size_t ctlen = 0;
+        signing(key, &ct, &ctlen, ss, ML_KEM_AUTH_SS_LENGTH);
+        START_MEASUREMENT(cycles_high_s, cycles_low_s);
+        ret = verification(key, ct, ctlen, ss, ssprime, ML_KEM_AUTH_SS_LENGTH);
+        if (likely(0 == ret)) {
+            END_MEASUREMENT(cycles_high_e, cycles_low_e);
+            start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+            end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+            deltas[k++] = end - start;
+        } else {
+            fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", type);
+            printf("[%s] ERROR\n", type);
+        }
+        sshkey_free(key);
+        free(ss);
+        free(ssprime);
+    }
+    compute_statistics(deltas, k, &min, &max, &mean, &median, &variance);
+    printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", type, min, max, mean, median, variance, sqrtl(variance), (SIZE_T_FMT_TYPE)k);
+    free(type);
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    int ret = 0;
+    size_t j, k;
+    u64 * deltas;
+    LONGDOUBLE min, max, mean, variance, median;
+    u32 cycles_low_s, cycles_high_s, cycles_low_e, cycles_high_e;
+    u64 start, end;
+
+    (void)argc;
+    (void)argv;
+
+    deltas = (u64 *) malloc(sizeof(*deltas) * ITERATIONS);
+
+    WARMUP_MEASUREMENT();
+    printf("type,min,max,mean,median,variance,std. dev.,iterations\n");
+    /* Nothing */
+    {
+        for(j = 0, k = 0; j < ITERATIONS; j++) {
+            START_MEASUREMENT(cycles_high_s, cycles_low_s);
+            ret = do_nothing();
+            if (likely(0 == ret)) {
+                END_MEASUREMENT(cycles_high_e, cycles_low_e);
+                start = ( ((u64) cycles_high_s << 040) | cycles_low_s );
+                end   = ( ((u64) cycles_high_e << 040) | cycles_low_e );
+                deltas[k++] = end - start;
+            } else {
+                fprintf(stderr, "Unexpected error occurred benchmarking type %s.\n", "NULL");
+                printf("[%s] ERROR\n", "NULL");
+            }
+        }
+        compute_statistics(deltas, k, &min, &max, &mean, &variance, &median);
+        printf("\"%s\",%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" LONGDOUBLE_FMT "e,%" SIZE_T_FMT "u\n", "NULL", min, max, mean, median, variance, sqrt(variance), (SIZE_T_FMT_TYPE)k);
+    }
+
+    benchmark_keygeneration(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_keygeneration(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_keygeneration(ML_KEM_AUTH_1024_BITS, deltas);
+    
+    benchmark_serialization_private(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_serialization_private(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_serialization_private(ML_KEM_AUTH_1024_BITS, deltas);
+    
+    benchmark_serialization_public(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_serialization_public(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_serialization_public(ML_KEM_AUTH_1024_BITS, deltas);
+    
+    benchmark_deserialization_private(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_deserialization_private(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_deserialization_private(ML_KEM_AUTH_1024_BITS, deltas);
+    
+    benchmark_deserialization_public(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_deserialization_public(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_deserialization_public(ML_KEM_AUTH_1024_BITS, deltas);
+
+    benchmark_encapsulation(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_encapsulation(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_encapsulation(ML_KEM_AUTH_1024_BITS, deltas);
+
+    benchmark_verification(ML_KEM_AUTH_512_BITS, deltas);
+    benchmark_verification(ML_KEM_AUTH_768_BITS, deltas);
+    benchmark_verification(ML_KEM_AUTH_1024_BITS, deltas);
+
+    free(deltas);
+
+    return !!ret;
+}
